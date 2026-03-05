@@ -140,6 +140,7 @@ namespace WindowsFormsApp1
                 int procesados = 0;
                 int encontrados = 0;
                 int noEncontrados = 0;
+                List<string> listaNoEncontrados = new List<string>();
 
                 foreach (var documento in documentos)
                 {
@@ -156,6 +157,7 @@ namespace WindowsFormsApp1
                     if (coincidencias.Count == 0)
                     {
                         noEncontrados++;
+                        listaNoEncontrados.Add(documento);
                         procesados++;
 
                         this.Invoke(new Action(() =>
@@ -248,6 +250,32 @@ namespace WindowsFormsApp1
                     listLog.Items.Add($"Documentos NO encontrados: {noEncontrados}");
                     listLog.Items.Add($"Total procesados: {procesados}");
                 }));
+
+                //---------------------------------
+                // EXPORTAR NO ENCONTRADOS
+                //---------------------------------
+
+                if (listaNoEncontrados.Count > 0)
+                {
+                    try
+                    {
+                        string archivoSalida = Path.Combine(
+                            RUTA_DESTINO,
+                            $"NoEncontrados_{DateTime.Now:yyyyMMdd_HHmmss}.txt"
+                        );
+
+                        File.WriteAllLines(archivoSalida, listaNoEncontrados);
+
+                        this.Invoke(new Action(() =>
+                        {
+                            listLog.Items.Add("");
+                            listLog.Items.Add($"📄 Archivo de no encontrados generado:");
+                            listLog.Items.Add(archivoSalida);
+                        }));
+                    }
+                    catch { }
+                }
+
             });
 
             listLog.Items.Add("🎉 Proceso terminado");

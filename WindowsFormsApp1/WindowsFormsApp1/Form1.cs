@@ -1,11 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.ComponentModel;
 using System.Data;
-using System.Drawing;
 using System.IO;
+using System.IO.Compression;
 using System.Linq;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
@@ -18,7 +16,7 @@ namespace WindowsFormsApp1
             InitializeComponent();
         }
 
-        
+
         private void btnOrigen_Click_1(object sender, EventArgs e)
         {
             FolderBrowserDialog f = new FolderBrowserDialog();
@@ -47,101 +45,220 @@ namespace WindowsFormsApp1
                 txtArchivo.Text = o.FileName;
         }
 
-        private void btnProcesar_Click_1(object sender, EventArgs e)
+        private async void btnProcesar_Click_1(object sender, EventArgs e)
         {
             listLog.Items.Clear();
+
             string RUTA_ORIGEN = txtOrigen.Text;
             string RUTA_DESTINO = txtDestino.Text;
             string ARCHIVO_LISTA = txtArchivo.Text;
-            try
+
+            Directory.CreateDirectory(RUTA_DESTINO);
+
+            listLog.Items.Add("🚀 Iniciando proceso...");
+
+            var documentos = File.ReadAllLines(ARCHIVO_LISTA)
+                                 .Where(x => !string.IsNullOrWhiteSpace(x))
+                                 .ToList();
+
+            progressBar1.Maximum = documentos.Count;
+            progressBar1.Value = 0;
+
+            lblContador.Text = $"Documentos procesados: 0 / {documentos.Count}";
+
+            await Task.Run(() =>
             {
-                Directory.CreateDirectory(RUTA_DESTINO);
+                //---------------------------------
+                // INDEXAR SERVIDOR
+                //---------------------------------
 
-                listLog.Items.Add("🚀 Iniciando proceso...");
+                this.Invoke(new Action(() =>
+                {
+                    listLog.Items.Add("🔎 Indexando archivos del servidor...");
+                }));
 
-                var documentos = File.ReadAllLines(ARCHIVO_LISTA)
-                                     .Where(x => !string.IsNullOrWhiteSpace(x))
-                                     .ToList();
+                Dictionary<string, List<string>> indiceArchivos =
+                    new Dictionary<string, List<string>>();
 
-                listLog.Items.Add($"Documentos a buscar: {documentos.Count}");
+                var archivos = Directory.GetFiles(RUTA_ORIGEN, "*.*", SearchOption.AllDirectories);
 
-                listLog.Items.Add("🔎 Indexando servidor...");
+                int contadorIndex = 0;
 
-                List<string> archivosServidor =
-                    Directory.GetFiles(RUTA_ORIGEN, "*.*", SearchOption.AllDirectories).ToList();
+                foreach (var archivo in archivos)
+                {
+                    string nombre = Path.GetFileName(archivo).ToLower();
 
-                listLog.Items.Add($"Total archivos encontrados: {archivosServidor.Count}");
+                    if (!indiceArchivos.ContainsKey(nombre))
+                        indiceArchivos[nombre] = new List<string>();
+
+                    indiceArchivos[nombre].Add(archivo);
+
+                    //---------------------------------
+                    // INDEXAR ZIP
+                    //---------------------------------
+
+                    if (nombre.EndsWith(".zip"))
+                    {
+                        try
+                        {
+                            using (ZipArchive zip = ZipFile.OpenRead(archivo))
+                            {
+                                foreach (var entry in zip.Entries)
+                                {
+                                    string nombreZip = entry.Name.ToLower();
+
+                                    if (!indiceArchivos.ContainsKey(nombreZip))
+                                        indiceArchivos[nombreZip] = new List<string>();
+
+                                    indiceArchivos[nombreZip].Add(archivo + "|" + entry.FullName);
+                                }
+                            }
+                        }
+                        catch { }
+                    }
+
+                    contadorIndex++;
+
+                    if (contadorIndex % 5000 == 0)
+                    {
+                        this.Invoke(new Action(() =>
+                        {
+                            listLog.Items.Add($"Indexados: {contadorIndex}");
+                        }));
+                    }
+                }
+
+                this.Invoke(new Action(() =>
+                {
+                    listLog.Items.Add($"📚 Total archivos indexados: {contadorIndex}");
+                }));
+
+                //---------------------------------
+                // PROCESAR DOCUMENTOS
+                //---------------------------------
+
+                int procesados = 0;
 
                 foreach (var documento in documentos)
                 {
-                    listLog.Items.Add($"Procesando: {documento}");
+                    this.Invoke(new Action(() =>
+                    {
+                        listLog.Items.Add($"📂 Buscando: {documento}");
+                    }));
 
-                    var coincidencias = archivosServidor
-                        .Where(x => Path.GetFileName(x).Contains(documento))
+                    var coincidencias = indiceArchivos
+                        .Where(x => x.Key.Contains(documento.ToLower()))
+                        .SelectMany(x => x.Value)
                         .ToList();
 
                     if (coincidencias.Count == 0)
                     {
-                        listLog.Items.Add("   ❌ No encontrado");
+                        this.Invoke(new Action(() =>
+                        {
+                            listLog.Items.Add("❌ No encontrado");
+                        }));
+
+                        procesados++;
                         continue;
                     }
 
                     string jsonFile = null;
                     string cuvFile = null;
-                    List<string> otros = new List<string>();
+                    string pdfFile = null;
+                    string zipFile = null;
 
                     foreach (var ruta in coincidencias)
                     {
-                        var nombre = Path.GetFileName(ruta).ToLower();
+                        string nombre;
+
+                        if (ruta.Contains("|"))
+                            nombre = ruta.Split('|')[1].ToLower();
+                        else
+                            nombre = Path.GetFileName(ruta).ToLower();
 
                         if (nombre.EndsWith(".json"))
                             jsonFile = ruta;
+
                         else if (nombre.Contains("cuv"))
                             cuvFile = ruta;
-                        else
-                            otros.Add(ruta);
+
+                        else if (nombre.EndsWith(".pdf"))
+                            pdfFile = ruta;
+
+                        else if (nombre.EndsWith(".zip"))
+                            zipFile = ruta;
                     }
 
-                    if (jsonFile == null)
+                    //---------------------------------
+                    // CREAR CARPETA JSON
+                    //---------------------------------
+
+                    if (jsonFile != null)
                     {
-                        listLog.Items.Add("   ⚠️ No se encontró JSON");
-                        continue;
+                        string nombreJson =
+                            jsonFile.Contains("|")
+                            ? Path.GetFileNameWithoutExtension(jsonFile.Split('|')[1])
+                            : Path.GetFileNameWithoutExtension(jsonFile);
+
+                        string carpetaDestino = Path.Combine(RUTA_DESTINO, nombreJson);
+
+                        Directory.CreateDirectory(carpetaDestino);
+
+                        CopiarArchivo(jsonFile, carpetaDestino);
+                        CopiarArchivo(cuvFile, carpetaDestino);
                     }
 
-                    string nombreCarpeta = Path.GetFileNameWithoutExtension(jsonFile);
-                    string carpetaDestino = Path.Combine(RUTA_DESTINO, nombreCarpeta);
+                    //---------------------------------
+                    // COPIAR PDF / ZIP SUELTOS
+                    //---------------------------------
 
-                    Directory.CreateDirectory(carpetaDestino);
+                    CopiarArchivo(pdfFile, RUTA_DESTINO);
+                    CopiarArchivo(zipFile, RUTA_DESTINO);
 
-                    foreach (var ruta in new[] { jsonFile, cuvFile })
+                    procesados++;
+
+                    this.Invoke(new Action(() =>
                     {
-                        if (ruta != null)
+                        progressBar1.Value = procesados;
+                        lblContador.Text = $"Documentos procesados: {procesados} / {documentos.Count}";
+                        listLog.Items.Add($"✅ Procesado: {documento}");
+                    }));
+                }
+            });
+
+            listLog.Items.Add("🎉 Proceso terminado");
+        }
+
+        void CopiarArchivo(string ruta, string destinoCarpeta)
+        {
+            if (ruta == null) return;
+
+            try
+            {
+                if (ruta.Contains("|"))
+                {
+                    var partes = ruta.Split('|');
+                    string zipPath = partes[0];
+                    string entryName = partes[1];
+
+                    using (ZipArchive zip = ZipFile.OpenRead(zipPath))
+                    {
+                        var entry = zip.GetEntry(entryName);
+
+                        if (entry != null)
                         {
-                            string destino = Path.Combine(carpetaDestino, Path.GetFileName(ruta));
-                            File.Copy(ruta, destino, true);
-                        }
-                    }
-
-                    foreach (var ruta in otros)
-                    {
-                        string nombre = Path.GetFileName(ruta).ToLower();
-
-                        if (nombre.EndsWith(".pdf") || nombre.EndsWith(".zip"))
-                        {
-                            string destino = Path.Combine(RUTA_DESTINO, Path.GetFileName(ruta));
-                            File.Copy(ruta, destino, true);
+                            string destino = Path.Combine(destinoCarpeta, entry.Name);
+                            entry.ExtractToFile(destino, true);
                         }
                     }
                 }
-
-                listLog.Items.Add("🎉 Proceso terminado");
+                else
+                {
+                    string destino = Path.Combine(destinoCarpeta, Path.GetFileName(ruta));
+                    File.Copy(ruta, destino, true);
+                }
             }
-            catch (Exception ex)
-            {
-                listLog.Items.Add($"⚠️ {ex.Message}");
-                
-            }
-            
+            catch { }
         }
     }
 }

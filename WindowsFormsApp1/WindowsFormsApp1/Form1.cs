@@ -138,6 +138,8 @@ namespace WindowsFormsApp1
                 //---------------------------------
 
                 int procesados = 0;
+                int encontrados = 0;
+                int noEncontrados = 0;
 
                 foreach (var documento in documentos)
                 {
@@ -153,12 +155,18 @@ namespace WindowsFormsApp1
 
                     if (coincidencias.Count == 0)
                     {
+                        noEncontrados++;
+                        procesados++;
+
                         this.Invoke(new Action(() =>
                         {
                             listLog.Items.Add("❌ No encontrado");
+                            listLog.Items.Add("--------------------------------");
+
+                            progressBar1.Value = procesados;
+                            lblContador.Text = $"Documentos procesados: {procesados} / {documentos.Count}";
                         }));
 
-                        procesados++;
                         continue;
                     }
 
@@ -215,15 +223,31 @@ namespace WindowsFormsApp1
                     CopiarArchivo(pdfFile, RUTA_DESTINO);
                     CopiarArchivo(zipFile, RUTA_DESTINO);
 
+                    encontrados++;
                     procesados++;
 
                     this.Invoke(new Action(() =>
                     {
                         progressBar1.Value = procesados;
                         lblContador.Text = $"Documentos procesados: {procesados} / {documentos.Count}";
+
                         listLog.Items.Add($"✅ Procesado: {documento}");
+                        listLog.Items.Add("--------------------------------");
                     }));
                 }
+
+                //---------------------------------
+                // RESUMEN FINAL
+                //---------------------------------
+
+                this.Invoke(new Action(() =>
+                {
+                    listLog.Items.Add("");
+                    listLog.Items.Add("========= RESUMEN =========");
+                    listLog.Items.Add($"Documentos encontrados: {encontrados}");
+                    listLog.Items.Add($"Documentos NO encontrados: {noEncontrados}");
+                    listLog.Items.Add($"Total procesados: {procesados}");
+                }));
             });
 
             listLog.Items.Add("🎉 Proceso terminado");

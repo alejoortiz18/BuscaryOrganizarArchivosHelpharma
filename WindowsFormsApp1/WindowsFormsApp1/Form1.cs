@@ -7,7 +7,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 
-namespace WindowsFormsApp1
+namespace BuscarArchivos
 {
     public partial class Form1 : Form
     {
@@ -23,7 +23,8 @@ namespace WindowsFormsApp1
 
             if (f.ShowDialog() == DialogResult.OK)
                 txtOrigen.Text = f.SelectedPath;
-            txtOrigen.Text = txtOrigen.Text.Replace("I:\\", "\\\\192.168.0.69\\Informes\\");
+            var split = txtOrigen.Text.Split('\\');
+            txtOrigen.Text = ($"\\\\192.168.0.69\\Informes\\{split[1]}");
 
         }
 
@@ -33,7 +34,8 @@ namespace WindowsFormsApp1
 
             if (f.ShowDialog() == DialogResult.OK)
                 txtDestino.Text = f.SelectedPath;
-            txtDestino.Text = txtDestino.Text.Replace("I:\\", "\\\\192.168.0.69\\Informes\\");
+            var split = txtDestino.Text.Split('\\');
+            txtDestino.Text = ($"\\\\192.168.0.69\\Informes\\{split[1]}");
         }
 
         private void btnArchivo_Click(object sender, EventArgs e)

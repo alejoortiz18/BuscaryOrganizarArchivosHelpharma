@@ -24,7 +24,11 @@ namespace BuscarArchivos
             if (f.ShowDialog() == DialogResult.OK)
                 txtOrigen.Text = f.SelectedPath;
             var split = txtOrigen.Text.Split('\\');
-            txtOrigen.Text = ($"\\\\192.168.0.69\\Informes\\{split[1]}");
+            if (split[0].ToLower() != "C:".ToLower()
+                && split[0].ToLower() != "D:".ToLower())
+            {
+                txtOrigen.Text = ($"\\\\192.168.0.69\\Informes\\{split[1]}");
+            }
 
         }
 
@@ -35,7 +39,10 @@ namespace BuscarArchivos
             if (f.ShowDialog() == DialogResult.OK)
                 txtDestino.Text = f.SelectedPath;
             var split = txtDestino.Text.Split('\\');
-            txtDestino.Text = ($"\\\\192.168.0.69\\Informes\\{split[1]}");
+            if (split[0].ToLower() != "C:".ToLower() 
+                && split[0].ToLower() != "D:".ToLower()) {
+                txtDestino.Text = ($"\\\\192.168.0.69\\Informes\\{split[1]}");
+            }
         }
 
         private void btnArchivo_Click(object sender, EventArgs e)

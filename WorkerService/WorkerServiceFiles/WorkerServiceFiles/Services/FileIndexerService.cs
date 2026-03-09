@@ -3,6 +3,8 @@ using WorkerServiceFiles.Data;
 using WorkerServiceFiles.Helper;
 using WorkerServiceFiles.Models;
 using WorkerServiceFiles.Models.ModelsFile;
+using System.IO.Compression;
+
 
 namespace WorkerServiceFiles.Services;
 
@@ -37,10 +39,10 @@ public class FileIndexerService
         {
             try
             {
-                var archivo = CrearModeloArchivo(rutaArchivo);
-
-                if (archivo != null)
+                foreach (var archivo in CrearModeloArchivo(rutaArchivo))
+                {
                     lote.Add(archivo);
+                }
 
                 if (lote.Count >= BatchSize)
                 {
@@ -61,14 +63,15 @@ public class FileIndexerService
             lote.Clear();
     }
 
-    private ArchivoModel CrearModeloArchivo(string rutaArchivo)
+    public IEnumerable<ArchivoModel> CrearModeloArchivo(string rutaArchivo)
     {
         var nombreArchivo = Path.GetFileName(rutaArchivo);
         var extension = Path.GetExtension(rutaArchivo).ToLower();
 
         var resultado = FileNameParser.ExtraerFactura(nombreArchivo);
 
-        return new ArchivoModel
+        // 1️⃣ Registrar el archivo físico (zip)
+        yield return new ArchivoModel
         {
             RutaCompleta = rutaArchivo,
             NombreArchivo = nombreArchivo,
@@ -76,6 +79,15 @@ public class FileIndexerService
             Prefijo = resultado.Prefijo,
             NumeroFactura = resultado.Numero
         };
+
+        // 2️⃣ Si es ZIP indexar contenido interno
+        if (extension == ".zip")
+        {
+            foreach (var archivoZip in EnumerarZip(rutaArchivo))
+            {
+                yield return archivoZip;
+            }
+        }
     }
 
     private IEnumerable<string> EnumerarArchivosSeguro(string ruta)
@@ -107,6 +119,31 @@ public class FileIndexerService
 
             foreach (var dir in subdirectorios)
                 pendientes.Push(dir);
+        }
+    }
+
+    private IEnumerable<ArchivoModel> EnumerarZip(string rutaZip)
+    {
+        using var archive = ZipFile.OpenRead(rutaZip);
+
+        foreach (var entry in archive.Entries)
+        {
+            if (string.IsNullOrEmpty(entry.Name))
+                continue;
+
+            var nombreArchivo = entry.Name;
+            var extension = Path.GetExtension(nombreArchivo).ToLower();
+
+            var resultado = FileNameParser.ExtraerFactura(nombreArchivo);
+
+            yield return new ArchivoModel
+            {
+                RutaCompleta = $"{rutaZip}|{entry.FullName}",
+                NombreArchivo = nombreArchivo,
+                Extension = extension,
+                Prefijo = resultado.Prefijo,
+                NumeroFactura = resultado.Numero
+            };
         }
     }
 }

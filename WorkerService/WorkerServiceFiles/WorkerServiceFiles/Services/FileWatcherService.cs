@@ -16,17 +16,20 @@ namespace WorkerServiceFiles.Services
         private readonly SqlRepository _repository;
         private readonly NasSettings _nasSettings;
         private readonly IndexerSettings _indexerSettings;
+        private readonly FileIndexerService _indexerService;
 
         private FileSystemWatcher? _watcher;
 
         public FileWatcherService(
             SqlRepository repository,
+            FileIndexerService indexerService,
             IOptions<NasSettings> nasOptions,
             IOptions<IndexerSettings> indexerOptions)
         {
             _repository = repository;
             _nasSettings = nasOptions.Value;
             _indexerSettings = indexerOptions.Value;
+            _indexerService = indexerService;
         }
 
         public void IniciarWatcher()
@@ -68,30 +71,10 @@ namespace WorkerServiceFiles.Services
             if (!File.Exists(rutaArchivo))
                 return;
 
-            var nombreArchivo = Path.GetFileName(rutaArchivo);
-            var extension = Path.GetExtension(rutaArchivo).ToLower();
-
-            string? prefijo = null;
-            string? numeroFactura = null;
-
-            if (_indexerSettings.ExtensionesFactura.Contains(extension))
+            foreach (var archivo in _indexerService.CrearModeloArchivo(rutaArchivo))
             {
-                var resultado = FileNameParser.ExtraerFactura(nombreArchivo);
-
-                prefijo = resultado.Prefijo;
-                numeroFactura = resultado.Numero;
+                await _repository.InsertArchivoAsync(archivo);
             }
-
-            var archivo = new ArchivoModel
-            {
-                RutaCompleta = rutaArchivo,
-                NombreArchivo = nombreArchivo,
-                Extension = extension,
-                Prefijo = prefijo,
-                NumeroFactura = numeroFactura
-            };
-
-            await _repository.InsertArchivoAsync(archivo);
         }
     }
 }

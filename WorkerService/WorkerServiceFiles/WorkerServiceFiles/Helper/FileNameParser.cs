@@ -23,7 +23,7 @@ namespace WorkerServiceFiles.Helper
 
             foreach (var prefijo in PrefijosValidos)
             {
-                var regex = new Regex($@"{prefijo}\s*(\d+)", RegexOptions.Compiled);
+                var regex = new Regex($@"{prefijo}[\s_]?(\d+)", RegexOptions.Compiled);
 
                 var match = regex.Match(nombre);
 

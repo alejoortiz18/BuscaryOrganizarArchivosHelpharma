@@ -12,6 +12,8 @@ public class FileIndexerService
     private readonly NasSettings _nasSettings;
     private readonly IndexerSettings _indexerSettings;
 
+    private const int BatchSize = 500;
+
     public FileIndexerService(
         SqlRepository repository,
         IOptions<NasSettings> nasOptions,
@@ -29,44 +31,51 @@ public class FileIndexerService
         if (!Directory.Exists(rutaNas))
             throw new DirectoryNotFoundException($"No se encontró la ruta NAS: {rutaNas}");
 
+        var lote = new List<ArchivoModel>(BatchSize);
+
         foreach (var rutaArchivo in EnumerarArchivosSeguro(rutaNas))
         {
             try
             {
-                await ProcesarArchivo(rutaArchivo);
+                var archivo = CrearModeloArchivo(rutaArchivo);
+
+                if (archivo != null)
+                    lote.Add(archivo);
+
+                if (lote.Count >= BatchSize)
+                {
+                    await _repository.BulkInsertStagingAsync(lote);
+                    await _repository.EjecutarMergeAsync();
+                    lote.Clear();
+                }
             }
             catch
             {
-                // Ignora errores de archivos individuales
+                // ignorar errores individuales
             }
         }
+
+        if (lote.Count > 0)
+            await _repository.BulkInsertStagingAsync(lote);
+            await _repository.EjecutarMergeAsync();
+            lote.Clear();
     }
 
-    private async Task ProcesarArchivo(string rutaArchivo)
+    private ArchivoModel CrearModeloArchivo(string rutaArchivo)
     {
         var nombreArchivo = Path.GetFileName(rutaArchivo);
         var extension = Path.GetExtension(rutaArchivo).ToLower();
 
-        string? prefijo = null;
-        string? numeroFactura = null;
+        var resultado = FileNameParser.ExtraerFactura(nombreArchivo);
 
-        if (_indexerSettings.ExtensionesFactura.Contains(extension))
-        {
-            var resultado = FileNameParser.ExtraerFactura(nombreArchivo);
-            prefijo = resultado.Prefijo;
-            numeroFactura = resultado.Numero;
-        }
-
-        var archivo = new ArchivoModel
+        return new ArchivoModel
         {
             RutaCompleta = rutaArchivo,
             NombreArchivo = nombreArchivo,
             Extension = extension,
-            Prefijo = prefijo,
-            NumeroFactura = numeroFactura
+            Prefijo = resultado.Prefijo,
+            NumeroFactura = resultado.Numero
         };
-
-        await _repository.InsertArchivoAsync(archivo);
     }
 
     private IEnumerable<string> EnumerarArchivosSeguro(string ruta)
@@ -85,19 +94,13 @@ public class FileIndexerService
             {
                 subdirectorios = Directory.GetDirectories(actual);
             }
-            catch
-            {
-                // Ignorar carpetas sin acceso
-            }
+            catch { }
 
             try
             {
                 archivos = Directory.GetFiles(actual);
             }
-            catch
-            {
-                // Ignorar archivos inaccesibles
-            }
+            catch { }
 
             foreach (var archivo in archivos)
                 yield return archivo;

@@ -1,8 +1,8 @@
-using Buscar_y_Organizar_archivos.Models;
+using ArchivosNas.Models;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
 
-namespace Buscar_y_Organizar_archivos.Controllers
+namespace ArchivosNas.Controllers
 {
     public class HomeController : Controller
     {

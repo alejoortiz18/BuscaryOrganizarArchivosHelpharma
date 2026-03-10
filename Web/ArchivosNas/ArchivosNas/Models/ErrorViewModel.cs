@@ -1,4 +1,4 @@
-namespace Buscar_y_Organizar_archivos.Models
+namespace ArchivosNas.Models
 {
     public class ErrorViewModel
     {

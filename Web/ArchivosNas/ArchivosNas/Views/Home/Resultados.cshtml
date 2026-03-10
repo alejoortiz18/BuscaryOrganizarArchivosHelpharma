@@ -1,5 +1,10 @@
 ﻿@model List<ArchivosNas.Models.Dto.ResultadoBusquedaDto>
 
+<hr />
+<a href="@Url.Action("Index", "Home")" class="btn btn-secondary mb-3">
+    ← Volver
+</a>
+
 <h3>Resultados</h3>
 
 <p>Total encontrados: @ViewBag.Total</p>
@@ -46,24 +51,13 @@
                 <td>@item.RutaCompleta</td>
 
                 <td>
-                    <a href="file:///@item.RutaCompleta" target="_blank" class="btn btn-success">
+                    <a asp-action="AbrirArchivo"
+                       asp-controller="Home"
+                       asp-route-ruta="@item.RutaCompleta"
+                       asp-route-nombre="@item.NombreArchivo"
+                       class="btn btn-success">
                         Abrir
                     </a>
-                </td>
-                <td>
-
-                    <form method="post" asp-action="GuardarArchivos">
-
-                        <input type="hidden" name="ids" value="@item.Id" />
-
-                        <input type="hidden" name="rutaDestino" value="@ViewBag.RutaDestino" />
-
-                        <button class="btn btn-warning">
-                            Guardar
-                        </button>
-
-                    </form>
-
                 </td>
 
             </tr>

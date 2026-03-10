@@ -1,5 +1,10 @@
 ﻿@model ArchivosNas.Models.Dto.ResultadoListadoDto
 
+<hr />
+<a href="@Url.Action("Index", "Home")" class="btn btn-secondary mb-3">
+    ← Volver
+</a>
+
 <h3>Resultado del listado</h3>
 
 <p>
@@ -52,11 +57,14 @@
                 <td>@item.NumeroFactura</td>
 
                 <td>
-                    <a href="file:///@item.RutaCompleta" target="_blank" class="btn btn-primary">
+                    <a asp-action="AbrirArchivo"
+                       asp-controller="Home"
+                       asp-route-ruta="@item.RutaCompleta"
+                       asp-route-nombre="@item.NombreArchivo"
+                       class="btn btn-success">
                         Abrir
                     </a>
                 </td>
-
             </tr>
         }
 

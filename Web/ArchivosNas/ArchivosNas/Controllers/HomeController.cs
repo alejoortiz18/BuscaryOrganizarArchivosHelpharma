@@ -2,6 +2,7 @@ using ArchivosNas.Data.IndexData;
 using ArchivosNas.Models;
 using ArchivosNas.Models.Dto;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 using System.IO.Compression;
 
@@ -39,8 +40,8 @@ namespace ArchivosNas.Controllers
             if (model.Archivo == null || model.Archivo.Length == 0)
                 return BadRequest("Debe subir un archivo");
 
-            if (string.IsNullOrEmpty(model.RutaDestino))
-                return BadRequest("Debe indicar ruta destino");
+            //if (string.IsNullOrEmpty(model.RutaDestino))
+            //    return BadRequest("Debe indicar ruta destino");
 
             var facturas = new List<string>();
 
@@ -108,6 +109,27 @@ namespace ArchivosNas.Controllers
             var bytes = await System.IO.File.ReadAllBytesAsync(zipPath);
 
             return File(bytes, "application/zip", "archivos.zip");
+        }
+
+        public async Task<IActionResult> AbrirArchivo(string ruta, string nombre)
+        {
+            if (string.IsNullOrEmpty(ruta))
+                return BadRequest();
+            string splitPath;
+            if (ruta.Contains("|"))
+            {
+                string[] split = ruta.Split("|");
+                ruta = split[0];
+                split = nombre.Split(".");
+                nombre = ($"{split[0]}.zip");
+            }
+
+            if (!System.IO.File.Exists(ruta))
+                return NotFound("Archivo no encontrado");
+
+            var bytes = await System.IO.File.ReadAllBytesAsync(ruta);
+
+            return File(bytes, "application/octet-stream", nombre);
         }
     }
 }

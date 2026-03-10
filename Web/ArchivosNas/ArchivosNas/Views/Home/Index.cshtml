@@ -60,22 +60,15 @@
 
         <div class="col-md-4">
 
-            <label>Archivo TXT / CSV</label>
+            <label class="form-label">Archivo TXT / CSV</label>
 
             <input type="file" name="Archivo" class="form-control" required />
 
         </div>
 
-        <div class="col-md-6">
-
-            <label>Ruta destino resultados</label>
-
-            <input type="text" name="RutaDestino" class="form-control" required />
-
-        </div>
+       
 
     </div>
-
     <br />
 
     <button type="submit" class="btn btn-success">
@@ -117,5 +110,29 @@
     nombre.addEventListener("input", controlarCampos);
     prefijo.addEventListener("input", controlarCampos);
     factura.addEventListener("input", controlarCampos);
+
+</script>
+
+<input type="file" id="selectorCarpeta" webkitdirectory directory multiple style="display:none">
+
+<script>
+
+    function seleccionarCarpeta() {
+
+        document.getElementById("selectorCarpeta").click();
+
+    }
+
+    document.getElementById("selectorCarpeta").addEventListener("change", function(e) {
+
+        if (e.target.files.length > 0) {
+
+            const ruta = e.target.files[0].webkitRelativePath.split('/')[0];
+
+            document.getElementById("rutaDestino").value = ruta;
+
+        }
+
+    });
 
 </script>

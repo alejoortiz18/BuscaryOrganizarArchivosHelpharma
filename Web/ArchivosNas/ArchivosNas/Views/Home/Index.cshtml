@@ -47,3 +47,39 @@
     </button>
 
 </form>
+
+
+
+<hr />
+
+<h4>Procesar listado de número de facturas</h4>
+
+<form method="post" enctype="multipart/form-data" asp-action="ProcesarListado">
+
+    <div class="row">
+
+        <div class="col-md-4">
+
+            <label>Archivo TXT / CSV</label>
+
+            <input type="file" name="Archivo" class="form-control" required />
+
+        </div>
+
+        <div class="col-md-6">
+
+            <label>Ruta destino resultados</label>
+
+            <input type="text" name="RutaDestino" class="form-control" required />
+
+        </div>
+
+    </div>
+
+    <br />
+
+    <button type="submit" class="btn btn-success">
+        Procesar listado
+    </button>
+
+</form>

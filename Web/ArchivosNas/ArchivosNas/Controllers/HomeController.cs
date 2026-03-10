@@ -31,5 +31,48 @@ namespace ArchivosNas.Controllers
 
             return View("Resultados", resultado.resultados);
         }
+
+        [HttpPost]
+        public async Task<IActionResult> ProcesarListado(ProcesarListadoDto model)
+        {
+            if (model.Archivo == null || model.Archivo.Length == 0)
+                return BadRequest("Debe subir un archivo");
+
+            if (string.IsNullOrEmpty(model.RutaDestino))
+                return BadRequest("Debe indicar ruta destino");
+
+            var facturas = new List<string>();
+
+            using (var reader = new StreamReader(model.Archivo.OpenReadStream()))
+            {
+                while (!reader.EndOfStream)
+                {
+                    var linea = await reader.ReadLineAsync();
+
+                    if (!string.IsNullOrWhiteSpace(linea))
+                        facturas.Add(linea.Trim());
+                }
+            }
+
+            var encontrados = await _indexadosData.BuscarPorListado(facturas);
+
+            var encontradosSet = encontrados
+                .Select(x => x.NumeroFactura)
+                .ToHashSet();
+
+            var noEncontrados = facturas
+                .Where(x => !encontradosSet.Contains(x))
+                .ToList();
+
+            var resultado = new ResultadoListadoDto
+            {
+                Encontrados = encontrados,
+                NoEncontrados = noEncontrados
+            };
+
+            ViewBag.RutaDestino = model.RutaDestino;
+
+            return View("ResultadoListado", resultado);
+        }
     }
 }

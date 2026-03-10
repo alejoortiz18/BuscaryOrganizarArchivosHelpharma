@@ -1,0 +1,51 @@
+﻿@model ArchivosNas.Models.Dto.ResultadoListadoDto
+
+<h3>Resultado del listado</h3>
+
+<p>
+    Archivos encontrados: <b>@Model.Encontrados.Count</b>
+</p>
+
+<p class="text-danger">
+    Archivos no encontrados: <b>@Model.NoEncontrados.Count</b>
+</p>
+
+<hr />
+
+<h4>Encontrados</h4>
+
+<table class="table table-bordered">
+
+    <thead>
+        <tr>
+            <th>Id</th>
+            <th>Nombre</th>
+            <th>Prefijo</th>
+            <th>Factura</th>
+            <th>Abrir</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+        @foreach (var item in Model.Encontrados)
+        {
+            <tr>
+
+                <td>@item.Id</td>
+                <td>@item.NombreArchivo</td>
+                <td>@item.Prefijo</td>
+                <td>@item.NumeroFactura</td>
+
+                <td>
+                    <a href="file:///@item.RutaCompleta" target="_blank" class="btn btn-primary">
+                        Abrir
+                    </a>
+                </td>
+
+            </tr>
+        }
+
+    </tbody>
+
+</table>

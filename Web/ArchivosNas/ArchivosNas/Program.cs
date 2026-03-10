@@ -1,3 +1,4 @@
+using ArchivosNas.Data.IndexData;
 using ArchivosNas.Models.Entities;
 using Microsoft.EntityFrameworkCore;
 
@@ -5,6 +6,9 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddControllersWithViews();
+
+builder.Services.AddScoped<IndexadosData>();
+
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServer")));
 var app = builder.Build();

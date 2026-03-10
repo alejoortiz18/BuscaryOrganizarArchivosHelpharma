@@ -1,3 +1,4 @@
+using ArchivosNas.Data.IndexData;
 using ArchivosNas.Models;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
@@ -6,20 +7,18 @@ namespace ArchivosNas.Controllers
 {
     public class HomeController : Controller
     {
-        public IActionResult Index()
+        private readonly IndexadosData _indexadosData;
+
+        public HomeController(IndexadosData indexadosData)
         {
-            return View();
+            _indexadosData = indexadosData;
         }
 
-        public IActionResult Privacy()
+        public async Task<IActionResult> Index()
         {
-            return View();
-        }
+            var dashboard = await _indexadosData.ObtenerDashboard();
 
-        [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
-        public IActionResult Error()
-        {
-            return View(new ErrorViewModel { RequestId = Activity.Current?.Id ?? HttpContext.TraceIdentifier });
+            return View(dashboard);
         }
     }
 }

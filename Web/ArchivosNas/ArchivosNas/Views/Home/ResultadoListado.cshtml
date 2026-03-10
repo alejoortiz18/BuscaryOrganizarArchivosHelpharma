@@ -12,6 +12,20 @@
 
 <hr />
 
+<form method="post" asp-action="DescargarZip">
+
+    @foreach (var item in Model.Encontrados)
+    {
+        <input type="hidden" name="ids" value="@item.Id" />
+    }
+
+    <button class="btn btn-success">
+        Descargar todos
+    </button>
+
+</form>
+<hr />
+
 <h4>Encontrados</h4>
 
 <table class="table table-bordered">

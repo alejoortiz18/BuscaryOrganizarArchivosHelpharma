@@ -4,6 +4,20 @@
 
 <p>Total encontrados: @ViewBag.Total</p>
 
+<form method="post" asp-action="DescargarZip">
+
+    @foreach (var item in Model)
+    {
+        <input type="hidden" name="ids" value="@item.Id" />
+    }
+
+    <button class="btn btn-success">
+        Descargar todos
+    </button>
+
+</form>
+<hr />
+
 <table class="table table-bordered">
 
     <thead>
@@ -35,6 +49,21 @@
                     <a href="file:///@item.RutaCompleta" target="_blank" class="btn btn-success">
                         Abrir
                     </a>
+                </td>
+                <td>
+
+                    <form method="post" asp-action="GuardarArchivos">
+
+                        <input type="hidden" name="ids" value="@item.Id" />
+
+                        <input type="hidden" name="rutaDestino" value="@ViewBag.RutaDestino" />
+
+                        <button class="btn btn-warning">
+                            Guardar
+                        </button>
+
+                    </form>
+
                 </td>
 
             </tr>

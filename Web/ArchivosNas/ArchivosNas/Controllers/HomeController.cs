@@ -3,6 +3,7 @@ using ArchivosNas.Models;
 using ArchivosNas.Models.Dto;
 using Microsoft.AspNetCore.Mvc;
 using System.Diagnostics;
+using System.IO.Compression;
 
 namespace ArchivosNas.Controllers
 {
@@ -73,6 +74,40 @@ namespace ArchivosNas.Controllers
             ViewBag.RutaDestino = model.RutaDestino;
 
             return View("ResultadoListado", resultado);
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> GuardarArchivos(string rutaDestino, List<long> ids)
+        {
+            var archivos = await _indexadosData.ObtenerPorIds(ids);
+
+            await _indexadosData.CopiarArchivos(archivos, rutaDestino);
+
+            return RedirectToAction("Index");
+        }
+
+        public async Task<IActionResult> DescargarZip(List<long> ids)
+        {
+            var archivos = await _indexadosData.ObtenerPorIds(ids);
+
+            var zipPath = Path.Combine(Path.GetTempPath(), $"archivos_{Guid.NewGuid()}.zip");
+
+            using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+            {
+                foreach (var archivo in archivos)
+                {
+                    if (System.IO.File.Exists(archivo.RutaCompleta))
+                    {
+                        zip.CreateEntryFromFile(
+                            archivo.RutaCompleta,
+                            archivo.NombreArchivo);
+                    }
+                }
+            }
+
+            var bytes = await System.IO.File.ReadAllBytesAsync(zipPath);
+
+            return File(bytes, "application/zip", "archivos.zip");
         }
     }
 }

@@ -27,17 +27,17 @@
 
         <div class="col-md-4">
             <label>Nombre Archivo</label>
-            <input name="NombreArchivo" class="form-control" />
+            <input id="nombreArchivo" name="NombreArchivo" class="form-control" />
         </div>
 
         <div class="col-md-4">
             <label>Prefijo</label>
-            <input name="Prefijo" class="form-control" />
+            <input id="prefijo" name="Prefijo" class="form-control" />
         </div>
 
         <div class="col-md-4">
             <label>Número Factura</label>
-            <input name="NumeroFactura" class="form-control" />
+            <input id="numeroFactura" name="NumeroFactura" class="form-control" />
         </div>
 
     </div>
@@ -83,3 +83,39 @@
     </button>
 
 </form>
+
+
+
+<script>
+
+    const nombre = document.getElementById("nombreArchivo");
+    const prefijo = document.getElementById("prefijo");
+    const factura = document.getElementById("numeroFactura");
+
+    function controlarCampos() {
+
+        if (nombre.value.trim() !== "") {
+            prefijo.disabled = true;
+            factura.disabled = true;
+        }
+        else if (prefijo.value.trim() !== "") {
+            nombre.disabled = true;
+            factura.disabled = true;
+        }
+        else if (factura.value.trim() !== "") {
+            nombre.disabled = true;
+            prefijo.disabled = true;
+        }
+        else {
+            nombre.disabled = false;
+            prefijo.disabled = false;
+            factura.disabled = false;
+        }
+
+    }
+
+    nombre.addEventListener("input", controlarCampos);
+    prefijo.addEventListener("input", controlarCampos);
+    factura.addEventListener("input", controlarCampos);
+
+</script>

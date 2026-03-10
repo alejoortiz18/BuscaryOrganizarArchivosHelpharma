@@ -85,5 +85,47 @@ namespace ArchivosNas.Data.IndexData
                 })
                 .ToListAsync();
         }
+
+        public async Task CopiarArchivos(List<ResultadoBusquedaDto> archivos, string rutaDestino)
+        {
+            if (!Directory.Exists(rutaDestino))
+                Directory.CreateDirectory(rutaDestino);
+
+            foreach (var archivo in archivos)
+            {
+                try
+                {
+                    var destino = Path.Combine(rutaDestino, archivo.NombreArchivo);
+
+                    if (!System.IO.File.Exists(destino))
+                    {
+                        System.IO.File.Copy(archivo.RutaCompleta, destino);
+                    }
+                }
+                catch
+                {
+                    // ignorar errores individuales
+                }
+            }
+
+            await Task.CompletedTask;
+        }
+
+
+        public async Task<List<ResultadoBusquedaDto>> ObtenerPorIds(List<long> ids)
+        {
+            return await _context.ArchivosIndexados
+                .Where(x => ids.Contains(x.Id))
+                .Select(x => new ResultadoBusquedaDto
+                {
+                    Id = x.Id,
+                    RutaCompleta = x.RutaCompleta,
+                    NombreArchivo = x.NombreArchivo,
+                    Extension = x.Extension,
+                    Prefijo = x.Prefijo,
+                    NumeroFactura = x.NumeroFactura
+                })
+                .ToListAsync();
+        }
     }
 }

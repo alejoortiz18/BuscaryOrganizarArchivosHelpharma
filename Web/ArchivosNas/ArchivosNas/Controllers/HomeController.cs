@@ -133,7 +133,6 @@ namespace ArchivosNas.Controllers
         }
 
         [HttpPost]
-        [HttpPost]
         public async Task<IActionResult> OrganizarRadicacion(ProcesarListadoDto model)
         {
             if (model.Archivo == null || model.Archivo.Length == 0)

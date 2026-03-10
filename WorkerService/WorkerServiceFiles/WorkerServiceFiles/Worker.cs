@@ -1,3 +1,6 @@
+using System.Diagnostics;
+using System.Net;
+using WorkerServiceFiles.Helper;
 using WorkerServiceFiles.Services;
 
 namespace WorkerServiceFiles
@@ -22,7 +25,29 @@ namespace WorkerServiceFiles
         {
             try
             {
-                _logger.LogInformation("Iniciando indexación inicial...");
+                var rutaNas = @"\\192.168.0.69\Informes";
+
+                _logger.LogInformation("Conectando sesión SMB con NAS...");
+
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = "cmd.exe",
+                    Arguments = "/c net use \\\\192.168.0.69\\Informes /user:ServiciosRelease\\radicacion h3lph@rm@,+",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                });
+
+                await Task.Delay(2000);
+
+                _logger.LogInformation("Esperando acceso a NAS: {ruta}", rutaNas);
+
+                while (!Directory.Exists(rutaNas))
+                {
+                    _logger.LogWarning("NAS no disponible aún: {ruta}", rutaNas);
+                    await Task.Delay(10000, stoppingToken);
+                }
+
+                _logger.LogInformation("NAS disponible, iniciando indexación...");
 
                 await _indexer.IndexarArchivosAsync();
 

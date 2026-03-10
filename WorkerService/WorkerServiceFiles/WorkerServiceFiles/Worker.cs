@@ -20,17 +20,27 @@ namespace WorkerServiceFiles
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            _logger.LogInformation("Iniciando indexación inicial...");
+            try
+            {
+                _logger.LogInformation("Iniciando indexación inicial...");
 
-            await _indexer.IndexarArchivosAsync();
+                await _indexer.IndexarArchivosAsync();
 
-            _logger.LogInformation("Indexación inicial completada");
+                _logger.LogInformation("Indexación inicial completada");
 
-            _watcher.IniciarWatcher();
+                _watcher.IniciarWatcher();
 
-            _logger.LogInformation("Watcher activo");
+                _logger.LogInformation("Watcher activo");
 
-            await Task.Delay(Timeout.Infinite, stoppingToken);
+                while (!stoppingToken.IsCancellationRequested)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error crítico en el servicio IndexadorNAS");
+            }
         }
     }
 }

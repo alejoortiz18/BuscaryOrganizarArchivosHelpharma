@@ -1,0 +1,45 @@
+﻿@model List<ArchivosNas.Models.Dto.ResultadoBusquedaDto>
+
+<h3>Resultados</h3>
+
+<p>Total encontrados: @ViewBag.Total</p>
+
+<table class="table table-bordered">
+
+    <thead>
+        <tr>
+            <th>Id</th>
+            <th>Nombre</th>
+            <th>Extension</th>
+            <th>Prefijo</th>
+            <th>Factura</th>
+            <th>Ruta</th>
+            <th>Abrir</th>
+        </tr>
+    </thead>
+
+    <tbody>
+
+        @foreach (var item in Model)
+        {
+            <tr>
+
+                <td>@item.Id</td>
+                <td>@item.NombreArchivo</td>
+                <td>@item.Extension</td>
+                <td>@item.Prefijo</td>
+                <td>@item.NumeroFactura</td>
+                <td>@item.RutaCompleta</td>
+
+                <td>
+                    <a href="file:///@item.RutaCompleta" target="_blank" class="btn btn-success">
+                        Abrir
+                    </a>
+                </td>
+
+            </tr>
+        }
+
+    </tbody>
+
+</table>

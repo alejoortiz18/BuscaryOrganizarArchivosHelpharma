@@ -28,5 +28,46 @@ namespace ArchivosNas.Data.IndexData
                 TotalDuplicadosNombre = duplicados
             };
         }
+
+        public async Task<(List<ResultadoBusquedaDto> resultados, int total)> Buscar(BusquedaDto filtro)
+        {
+            const int pageSize = 20;
+
+            var query = _context.ArchivosIndexados.AsQueryable();
+
+            if (!string.IsNullOrEmpty(filtro.NombreArchivo))
+            {
+                query = query.Where(x => x.NombreArchivo.Contains(filtro.NombreArchivo));
+            }
+
+            if (!string.IsNullOrEmpty(filtro.Prefijo))
+            {
+                query = query.Where(x => x.Prefijo == filtro.Prefijo);
+            }
+
+            if (!string.IsNullOrEmpty(filtro.NumeroFactura))
+            {
+                query = query.Where(x => x.NumeroFactura == filtro.NumeroFactura);
+            }
+
+            var total = await query.CountAsync();
+
+            var resultados = await query
+                .OrderBy(x => x.Id)
+                .Skip((filtro.Pagina - 1) * pageSize)
+                .Take(pageSize)
+                .Select(x => new ResultadoBusquedaDto
+                {
+                    Id = x.Id,
+                    RutaCompleta = x.RutaCompleta,
+                    NombreArchivo = x.NombreArchivo,
+                    Extension = x.Extension,
+                    Prefijo = x.Prefijo,
+                    NumeroFactura = x.NumeroFactura
+                })
+                .ToListAsync();
+
+            return (resultados, total);
+        }
     }
 }

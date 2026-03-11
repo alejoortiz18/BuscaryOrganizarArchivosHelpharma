@@ -1,6 +1,8 @@
 using ArchivosNas.Data.IndexData;
 using ArchivosNas.Models.Entities;
 using Microsoft.EntityFrameworkCore;
+using System.Diagnostics;
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +14,24 @@ builder.Services.AddScoped<IndexadosData>();
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServer")));
 var app = builder.Build();
+
+
+try
+{
+    var psi = new ProcessStartInfo
+    {
+        FileName = "cmd.exe",
+        Arguments = "/c net use \\\\192.168.0.69\\Informes /user:ServiciosRelease\\radicacion h3lph@rm@,+",
+        CreateNoWindow = true,
+        UseShellExecute = false
+    };
+
+    Process.Start(psi);
+}
+catch (Exception ex)
+{
+    Console.WriteLine("Error conectando a NAS: " + ex.Message);
+}
 
 // Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())

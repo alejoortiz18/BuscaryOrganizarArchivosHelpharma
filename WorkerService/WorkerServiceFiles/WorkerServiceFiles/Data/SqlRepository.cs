@@ -80,7 +80,7 @@ namespace WorkerServiceFiles.Data
             using var bulkCopy = new SqlBulkCopy(connection)
             {
                 DestinationTableName = "ArchivosIndexados",
-                BatchSize = 500,
+                BatchSize = 20000,
                 BulkCopyTimeout = 0
             };
 
@@ -120,7 +120,7 @@ namespace WorkerServiceFiles.Data
             using var bulkCopy = new SqlBulkCopy(connection)
             {
                 DestinationTableName = "ArchivosIndexados_Staging",
-                BatchSize = 5000,
+                BatchSize = 20000,
                 BulkCopyTimeout = 0
             };
 

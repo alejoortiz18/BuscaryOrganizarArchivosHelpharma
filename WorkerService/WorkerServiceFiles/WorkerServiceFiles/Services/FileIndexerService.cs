@@ -1,9 +1,10 @@
 ﻿using Microsoft.Extensions.Options;
+using System.Collections.Concurrent;
+using System.IO.Compression;
 using WorkerServiceFiles.Data;
 using WorkerServiceFiles.Helper;
 using WorkerServiceFiles.Models;
 using WorkerServiceFiles.Models.ModelsFile;
-using System.IO.Compression;
 
 
 namespace WorkerServiceFiles.Services;
@@ -26,6 +27,7 @@ public class FileIndexerService
         _indexerSettings = indexerOptions.Value;
     }
 
+
     public async Task IndexarArchivosAsync()
     {
         var rutaNas = _nasSettings.RutaNas;
@@ -33,34 +35,61 @@ public class FileIndexerService
         if (!Directory.Exists(rutaNas))
             throw new DirectoryNotFoundException($"No se encontró la ruta NAS: {rutaNas}");
 
-        var lote = new List<ArchivoModel>(BatchSize);
+        var cola = new BlockingCollection<ArchivoModel>(100000);
 
-        foreach (var rutaArchivo in EnumerarArchivosSeguro(rutaNas))
+        var escritor = Task.Run(async () =>
         {
-            try
+            var lote = new List<ArchivoModel>(BatchSize);
+            int contadorLotes = 0;
+
+            foreach (var archivo in cola.GetConsumingEnumerable())
             {
-                foreach (var archivo in CrearModeloArchivo(rutaArchivo))
-                {
-                    lote.Add(archivo);
-                }
+                lote.Add(archivo);
 
                 if (lote.Count >= BatchSize)
                 {
                     await _repository.BulkInsertStagingAsync(lote);
-                    await _repository.EjecutarMergeAsync();
                     lote.Clear();
+
+                    contadorLotes++;
+
+                    if (contadorLotes % 20 == 0)
+                        await _repository.EjecutarMergeAsync();
                 }
             }
-            catch
-            {
-                // ignorar errores individuales
-            }
-        }
 
-        if (lote.Count > 0)
-            await _repository.BulkInsertStagingAsync(lote);
+            if (lote.Count > 0)
+                await _repository.BulkInsertStagingAsync(lote);
+
             await _repository.EjecutarMergeAsync();
-            lote.Clear();
+        });
+
+        var opciones = new ParallelOptions
+        {
+            MaxDegreeOfParallelism = Environment.ProcessorCount
+        };
+
+        Parallel.ForEach(
+            Directory.EnumerateDirectories(rutaNas),
+            opciones,
+            carpeta =>
+            {
+                foreach (var rutaArchivo in EnumerarArchivosSeguro(carpeta))
+                {
+                    try
+                    {
+                        foreach (var archivo in CrearModeloArchivo(rutaArchivo))
+                        {
+                            cola.Add(archivo);
+                        }
+                    }
+                    catch { }
+                }
+            });
+
+        cola.CompleteAdding();
+
+        await escritor;
     }
 
     public IEnumerable<ArchivoModel> CrearModeloArchivo(string rutaArchivo)
@@ -99,18 +128,18 @@ public class FileIndexerService
         {
             var actual = pendientes.Pop();
 
-            string[] subdirectorios = Array.Empty<string>();
-            string[] archivos = Array.Empty<string>();
+            IEnumerable<string> subdirectorios = Enumerable.Empty<string>();
+            IEnumerable<string> archivos = Enumerable.Empty<string>();
 
             try
             {
-                subdirectorios = Directory.GetDirectories(actual);
+                subdirectorios = Directory.EnumerateDirectories(actual);
             }
             catch { }
 
             try
             {
-                archivos = Directory.GetFiles(actual);
+                archivos = Directory.EnumerateFiles(actual);
             }
             catch { }
 

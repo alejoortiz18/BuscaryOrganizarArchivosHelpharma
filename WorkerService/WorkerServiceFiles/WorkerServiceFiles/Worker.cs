@@ -1,6 +1,4 @@
 using System.Diagnostics;
-using System.Net;
-using WorkerServiceFiles.Helper;
 using WorkerServiceFiles.Services;
 
 namespace WorkerServiceFiles
@@ -8,16 +6,13 @@ namespace WorkerServiceFiles
     public class Worker : BackgroundService
     {
         private readonly ILogger<Worker> _logger;
-        private readonly FileIndexerService _indexer;
         private readonly FileWatcherService _watcher;
 
         public Worker(
             ILogger<Worker> logger,
-            FileIndexerService indexer,
             FileWatcherService watcher)
         {
             _logger = logger;
-            _indexer = indexer;
             _watcher = watcher;
         }
 
@@ -37,7 +32,7 @@ namespace WorkerServiceFiles
                     UseShellExecute = false
                 });
 
-                await Task.Delay(2000);
+                await Task.Delay(2000, stoppingToken);
 
                 _logger.LogInformation("Esperando acceso a NAS: {ruta}", rutaNas);
 
@@ -47,15 +42,12 @@ namespace WorkerServiceFiles
                     await Task.Delay(10000, stoppingToken);
                 }
 
-                _logger.LogInformation("NAS disponible, iniciando indexación...");
+                _logger.LogInformation("NAS disponible");
 
-                await _indexer.IndexarArchivosAsync();
-
-                _logger.LogInformation("Indexación inicial completada");
-
+                // 🔹 SOLO iniciamos watcher
                 _watcher.IniciarWatcher();
 
-                _logger.LogInformation("Watcher activo");
+                _logger.LogInformation("Watcher activo, escuchando cambios...");
 
                 while (!stoppingToken.IsCancellationRequested)
                 {

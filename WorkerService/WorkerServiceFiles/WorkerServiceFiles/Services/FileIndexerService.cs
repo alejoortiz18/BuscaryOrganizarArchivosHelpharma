@@ -153,26 +153,42 @@ public class FileIndexerService
 
     private IEnumerable<ArchivoModel> EnumerarZip(string rutaZip)
     {
-        using var archive = ZipFile.OpenRead(rutaZip);
+        if (!File.Exists(rutaZip))
+            yield break;
 
-        foreach (var entry in archive.Entries)
+        ZipArchive archive;
+
+        try
         {
-            if (string.IsNullOrEmpty(entry.Name))
-                continue;
+            archive = ZipFile.OpenRead(rutaZip);
+        }
+        catch
+        {
+            yield break;
+        }
 
-            var nombreArchivo = entry.Name;
-            var extension = Path.GetExtension(nombreArchivo).ToLower();
+        using (archive)
+        {
 
-            var resultado = FileNameParser.ExtraerFactura(nombreArchivo);
-
-            yield return new ArchivoModel
+            foreach (var entry in archive.Entries)
             {
-                RutaCompleta = $"{rutaZip}|{entry.FullName}",
-                NombreArchivo = nombreArchivo,
-                Extension = extension,
-                Prefijo = resultado.Prefijo,
-                NumeroFactura = resultado.Numero
-            };
+                if (string.IsNullOrEmpty(entry.Name))
+                    continue;
+
+                var nombreArchivo = entry.Name;
+                var extension = Path.GetExtension(nombreArchivo).ToLower();
+
+                var resultado = FileNameParser.ExtraerFactura(nombreArchivo);
+
+                yield return new ArchivoModel
+                {
+                    RutaCompleta = $"{rutaZip}|{entry.FullName}",
+                    NombreArchivo = nombreArchivo,
+                    Extension = extension,
+                    Prefijo = resultado.Prefijo,
+                    NumeroFactura = resultado.Numero
+                };
+            }
         }
     }
 }

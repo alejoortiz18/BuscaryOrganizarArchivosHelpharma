@@ -29,13 +29,15 @@ namespace Indexador.Services
                     var nombre = Path.GetFileName(entry.Key);
                     var extension = Path.GetExtension(nombre)?.ToLower() ?? "";
 
+                    var factura = ExtraerFactura(nombre);
+
                     resultados.Add(new ArchivoModel
                     {
                         RutaCompleta = rutaZip + "\\" + nombre,
                         NombreArchivo = nombre,
                         Extension = extension,
-                        Prefijo = null,
-                        NumeroFactura = null
+                        Prefijo = factura.Prefijo,
+                        NumeroFactura = factura.Numero
                     });
 
                     contador++;
@@ -49,6 +51,27 @@ namespace Indexador.Services
             }
 
             return resultados;
+        }
+
+        private (string? Prefijo, string? Numero) ExtraerFactura(string nombre)
+        {
+            if (string.IsNullOrWhiteSpace(nombre))
+                return (null, null);
+
+            var match = System.Text.RegularExpressions.Regex.Match(
+                nombre,
+                @"([A-Za-z]{1,5})[-_]?(\d{3,})"
+            );
+
+            if (match.Success)
+            {
+                var prefijo = match.Groups[1].Value.ToUpper();
+                var numero = match.Groups[2].Value;
+
+                return (prefijo, numero);
+            }
+
+            return (null, null);
         }
     }
 }

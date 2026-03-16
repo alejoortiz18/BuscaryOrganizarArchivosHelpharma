@@ -1,13 +1,6 @@
 ﻿using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using WorkerServiceFiles.Data;
-using WorkerServiceFiles.Helper;
 using WorkerServiceFiles.Models;
-using WorkerServiceFiles.Models.ModelsFile;
 
 namespace WorkerServiceFiles.Services
 {
@@ -15,7 +8,6 @@ namespace WorkerServiceFiles.Services
     {
         private readonly SqlRepository _repository;
         private readonly NasSettings _nasSettings;
-        private readonly IndexerSettings _indexerSettings;
         private readonly FileIndexerService _indexerService;
 
         private FileSystemWatcher? _watcher;
@@ -23,12 +15,10 @@ namespace WorkerServiceFiles.Services
         public FileWatcherService(
             SqlRepository repository,
             FileIndexerService indexerService,
-            IOptions<NasSettings> nasOptions,
-            IOptions<IndexerSettings> indexerOptions)
+            IOptions<NasSettings> nasOptions)
         {
             _repository = repository;
             _nasSettings = nasOptions.Value;
-            _indexerSettings = indexerOptions.Value;
             _indexerService = indexerService;
         }
 
@@ -42,28 +32,56 @@ namespace WorkerServiceFiles.Services
                     NotifyFilters.FileName |
                     NotifyFilters.Size |
                     NotifyFilters.LastWrite,
+
                 InternalBufferSize = 65536
             };
 
             _watcher.Created += OnCreated;
             _watcher.Deleted += OnDeleted;
             _watcher.Renamed += OnRenamed;
+            _watcher.Error += OnError;
+
+            Console.WriteLine($"Watcher iniciado en {_nasSettings.RutaNas}");
         }
 
         private async void OnCreated(object sender, FileSystemEventArgs e)
         {
+            if (Directory.Exists(e.FullPath))
+                return;
+
+            await EsperarArchivoDisponible(e.FullPath);
+
             await ProcesarArchivo(e.FullPath);
         }
 
         private async void OnDeleted(object sender, FileSystemEventArgs e)
         {
+            if (Directory.Exists(e.FullPath))
+                return;
+
             await _repository.DeleteArchivoAsync(e.FullPath);
         }
 
         private async void OnRenamed(object sender, RenamedEventArgs e)
         {
+            if (Directory.Exists(e.FullPath))
+                return;
+
             await _repository.DeleteArchivoAsync(e.OldFullPath);
+
+            await EsperarArchivoDisponible(e.FullPath);
+
             await ProcesarArchivo(e.FullPath);
+        }
+
+        private void OnError(object sender, ErrorEventArgs e)
+        {
+            Console.WriteLine("Watcher error: " + e.GetException().Message);
+
+            // reiniciar watcher
+            _watcher?.Dispose();
+
+            IniciarWatcher();
         }
 
         private async Task ProcesarArchivo(string rutaArchivo)
@@ -74,6 +92,25 @@ namespace WorkerServiceFiles.Services
             foreach (var archivo in _indexerService.CrearModeloArchivo(rutaArchivo))
             {
                 await _repository.InsertArchivoAsync(archivo);
+            }
+        }
+
+        private async Task EsperarArchivoDisponible(string ruta)
+        {
+            int intentos = 0;
+
+            while (intentos < 10)
+            {
+                try
+                {
+                    using var stream = File.Open(ruta, FileMode.Open, FileAccess.Read, FileShare.None);
+                    return;
+                }
+                catch
+                {
+                    intentos++;
+                    await Task.Delay(500);
+                }
             }
         }
     }

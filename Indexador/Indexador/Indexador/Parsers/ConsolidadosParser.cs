@@ -14,14 +14,27 @@ namespace Indexador.Parsers
                 if (string.IsNullOrWhiteSpace(linea))
                     continue;
 
-                // ignorar archivos internos del zip
-                if (linea.StartsWith("->"))
-                    continue;
-
                 var ruta = linea.Trim();
 
-                var nombre = Path.GetFileName(ruta);
-                var extension = Path.GetExtension(nombre).ToLower();
+                string nombre;
+                string extension;
+
+                // CASO 1: archivo dentro de zip
+                if (ruta.Contains("|"))
+                {
+                    var partes = ruta.Split('|');
+
+                    var nombreInterno = partes[1];
+
+                    nombre = Path.GetFileName(nombreInterno);
+                    extension = Path.GetExtension(nombre).ToLower();
+                }
+                else
+                {
+                    // CASO 2: archivo normal
+                    nombre = Path.GetFileName(ruta);
+                    extension = Path.GetExtension(nombre).ToLower();
+                }
 
                 var (prefijo, numero) = FacturaParser.Extraer(nombre);
 

@@ -3,7 +3,7 @@ using Indexador.Services;
 using Indexador.Models;
 using Indexador.Parsers;
 
-var rutaTxt = @"C:\Users\alejandro.ortiz\Documents\helpharma\Documentos\indexado masivo\Consolidados\consolidados.txt";
+var rutaTxt = @"C:\Users\serviciosrelease\Documents\Reportes\IndexacionNAS\Consolidados\consolidados.txt";
 
 var repo = new SqlRepository();
 

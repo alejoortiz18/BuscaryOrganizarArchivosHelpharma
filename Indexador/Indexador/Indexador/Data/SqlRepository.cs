@@ -32,15 +32,31 @@ namespace Indexador.Data
             table.Columns.Add("Prefijo", typeof(string));
             table.Columns.Add("NumeroFactura", typeof(string));
 
+            // 🔍 Construcción del DataTable con logging
             foreach (var a in archivos)
             {
-                table.Rows.Add(
-                    a.RutaCompleta,
-                    a.NombreArchivo,
-                    a.Extension,
-                    a.Prefijo,
-                    a.NumeroFactura
-                );
+                try
+                {
+                    table.Rows.Add(
+                        a.RutaCompleta,
+                        a.NombreArchivo,
+                        a.Extension,
+                        a.Prefijo,
+                        a.NumeroFactura
+                    );
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine("❌ ERROR ARMANDO FILA:");
+                    Console.WriteLine($"Ruta: {a.RutaCompleta}");
+                    Console.WriteLine($"Nombre: {a.NombreArchivo}");
+                    Console.WriteLine($"Extension: {a.Extension}");
+                    Console.WriteLine($"Prefijo: {a.Prefijo}");
+                    Console.WriteLine($"Numero: {a.NumeroFactura}");
+                    Console.WriteLine(ex.Message);
+
+                    throw;
+                }
             }
 
             bulkCopy.ColumnMappings.Add("RutaCompleta", "RutaCompleta");
@@ -49,7 +65,67 @@ namespace Indexador.Data
             bulkCopy.ColumnMappings.Add("Prefijo", "Prefijo");
             bulkCopy.ColumnMappings.Add("NumeroFactura", "NumeroFactura");
 
-            await bulkCopy.WriteToServerAsync(table);
+            // 🔥 DEBUG DEL ERROR REAL EN SQL BULK
+            try
+            {
+                await bulkCopy.WriteToServerAsync(table);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("💣 ERROR EN BULK INSERT");
+
+                int index = 0;
+
+                foreach (DataRow row in table.Rows)
+                {
+                    try
+                    {
+                        var ruta = row["RutaCompleta"]?.ToString();
+                        var nombre = row["NombreArchivo"]?.ToString();
+                        var ext = row["Extension"]?.ToString();
+                        var prefijo = row["Prefijo"]?.ToString();
+                        var numero = row["NumeroFactura"]?.ToString();
+
+                        // 🔴 Validaciones clave
+                        if (ext != null && ext.Length > 20)
+                        {
+                            Console.WriteLine("🚨 EXTENSION DEMASIADO LARGA");
+                            Console.WriteLine($"Index: {index}");
+                            Console.WriteLine($"Extension: {ext}");
+                            Console.WriteLine($"Length: {ext.Length}");
+                            Console.WriteLine($"Archivo: {nombre}");
+                            Console.WriteLine($"Ruta: {ruta}");
+                            break;
+                        }
+
+                        if (nombre != null && nombre.Length > 500)
+                        {
+                            Console.WriteLine("🚨 NOMBRE DEMASIADO LARGO");
+                            Console.WriteLine($"Nombre: {nombre}");
+                            break;
+                        }
+
+                        if (ruta != null && ruta.Length > 1000)
+                        {
+                            Console.WriteLine("🚨 RUTA DEMASIADO LARGA");
+                            Console.WriteLine($"Ruta: {ruta}");
+                            break;
+                        }
+                    }
+                    catch (Exception innerEx)
+                    {
+                        Console.WriteLine("⚠️ Error inspeccionando fila:");
+                        Console.WriteLine(innerEx.Message);
+                    }
+
+                    index++;
+                }
+
+                Console.WriteLine("🔥 EXCEPCIÓN ORIGINAL:");
+                Console.WriteLine(ex.Message);
+
+                throw;
+            }
         }
 
         public async Task EjecutarMergeAsync()
@@ -75,7 +151,7 @@ namespace Indexador.Data
                 (
                     source.RutaCompleta,
                     source.NombreArchivo,
-                    source.Extension,
+                    LEFT(source.Extension, 20),
                     source.Prefijo,
                     source.NumeroFactura
                 );

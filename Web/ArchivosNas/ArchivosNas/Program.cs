@@ -13,7 +13,10 @@ builder.Services.AddScoped<IndexadosData>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServer")));
+
+builder.Services.AddSession();
 var app = builder.Build();
+app.UseSession(); 
 
 
 try

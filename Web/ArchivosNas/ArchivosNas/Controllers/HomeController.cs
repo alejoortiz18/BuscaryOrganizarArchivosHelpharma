@@ -12,6 +12,10 @@ namespace ArchivosNas.Controllers
     {
         private readonly IndexadosData _indexadosData;
 
+        private static Dictionary<string, int> progresoPorJob = new();
+        private static Dictionary<string, string> zipPorJob = new();
+
+
         public HomeController(IndexadosData indexadosData)
         {
             _indexadosData = indexadosData;
@@ -24,40 +28,59 @@ namespace ArchivosNas.Controllers
             return View(dashboard);
         }
 
+
         [HttpPost]
         public async Task<IActionResult> Buscar(BusquedaDto filtro)
         {
             var resultado = await _indexadosData.Buscar(filtro);
 
             ViewBag.Total = resultado.total;
+            ViewBag.Pagina = filtro.Pagina;
+            ViewBag.PageSize = 20;
+
+            // 🔥 ESTO ES LO QUE TE FALTABA
+            ViewBag.NombreArchivo = filtro.NombreArchivo;
+            ViewBag.Prefijo = filtro.Prefijo;
+            ViewBag.NumeroFactura = filtro.NumeroFactura;
 
             return View("Resultados", resultado.resultados);
         }
 
         [HttpPost]
-        public async Task<IActionResult> ProcesarListado(ProcesarListadoDto model)
+        public async Task<IActionResult> ProcesarListado(ProcesarListadoDto model, int pagina = 1, List<string> Facturas = null)
         {
-            if (model.Archivo == null || model.Archivo.Length == 0)
-                return BadRequest("Debe subir un archivo");
+            List<string> facturas;
 
-            //if (string.IsNullOrEmpty(model.RutaDestino))
-            //    return BadRequest("Debe indicar ruta destino");
-
-            var facturas = new List<string>();
-
-            using (var reader = new StreamReader(model.Archivo.OpenReadStream()))
+            // 🔥 SI VIENE ARCHIVO (primera vez)
+            if (model.Archivo != null && model.Archivo.Length > 0)
             {
-                while (!reader.EndOfStream)
-                {
-                    var linea = await reader.ReadLineAsync();
+                facturas = new List<string>();
 
-                    if (!string.IsNullOrWhiteSpace(linea))
-                        facturas.Add(linea.Trim());
+                using (var reader = new StreamReader(model.Archivo.OpenReadStream()))
+                {
+                    while (!reader.EndOfStream)
+                    {
+                        var linea = await reader.ReadLineAsync();
+
+                        if (!string.IsNullOrWhiteSpace(linea))
+                            facturas.Add(linea.Trim());
+                    }
                 }
+            }
+            else
+            {
+                // 🔥 SI VIENE DE PAGINACIÓN
+                if (Facturas == null || !Facturas.Any())
+                    return BadRequest("No hay datos para procesar");
+
+                facturas = Facturas;
             }
 
             var encontrados = await _indexadosData.BuscarPorListado(facturas);
-
+            HttpContext.Session.SetString(
+                "EncontradosCache",
+                System.Text.Json.JsonSerializer.Serialize(encontrados)
+            );
             var encontradosSet = encontrados
                 .Select(x => x.NumeroFactura)
                 .ToHashSet();
@@ -66,16 +89,99 @@ namespace ArchivosNas.Controllers
                 .Where(x => !encontradosSet.Contains(x))
                 .ToList();
 
+            // 🔥 PAGINACIÓN
+            int pageSize = 20;
+            var total = encontrados.Count;
+
+            var encontradosPaginados = encontrados
+                .Skip((pagina - 1) * pageSize)
+                .Take(pageSize)
+                .ToList();
+
             var resultado = new ResultadoListadoDto
             {
-                Encontrados = encontrados,
+                Encontrados = encontradosPaginados,
                 NoEncontrados = noEncontrados
             };
-
+            ViewBag.TodosEncontrados = encontrados;
+            // 🔥 VIEWBAG
+            ViewBag.Total = total;
+            ViewBag.Pagina = pagina;
+            ViewBag.PageSize = pageSize;
+            ViewBag.Facturas = facturas;
             ViewBag.RutaDestino = model.RutaDestino;
 
             return View("ResultadoListado", resultado);
         }
+
+        [HttpPost]
+        public async Task<IActionResult> IniciarZip()
+        {
+            var jobId = Guid.NewGuid().ToString();
+
+            progresoPorJob[jobId] = 0;
+
+            var encontradosJson = HttpContext.Session.GetString("EncontradosCache");
+
+            var encontrados = System.Text.Json.JsonSerializer
+                .Deserialize<List<ResultadoBusquedaDto>>(encontradosJson);
+
+            var ids = encontrados.Select(x => x.Id).ToList();
+
+            var archivos = await _indexadosData.ObtenerPorIds(ids);
+
+            var zipPath = Path.Combine(Path.GetTempPath(), $"archivos_{jobId}.zip");
+            zipPorJob[jobId] = zipPath;
+
+            _ = Task.Run(() =>
+            {
+                using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+                {
+                    int total = archivos.Count;
+                    int actual = 0;
+
+                    foreach (var archivo in archivos)
+                    {
+                        if (System.IO.File.Exists(archivo.RutaCompleta))
+                        {
+                            zip.CreateEntryFromFile(archivo.RutaCompleta, archivo.NombreArchivo);
+                        }
+
+                        actual++;
+                        progresoPorJob[jobId] = (int)((actual * 100.0) / total);
+                    }
+                }
+
+                progresoPorJob[jobId] = 100;
+            });
+
+            return Json(new { jobId });
+        }
+
+
+        [HttpGet]
+        public IActionResult ProgresoZip(string jobId)
+        {
+            if (!progresoPorJob.ContainsKey(jobId))
+                return Json(new { porcentaje = 0 });
+
+            return Json(new { porcentaje = progresoPorJob[jobId] });
+        }
+
+
+        [HttpGet]
+        public async Task<IActionResult> DescargarZipFinal(string jobId)
+        {
+            if (!zipPorJob.ContainsKey(jobId))
+                return BadRequest();
+
+            var path = zipPorJob[jobId];
+
+            var bytes = await System.IO.File.ReadAllBytesAsync(path);
+
+            return File(bytes, "application/zip", "archivos.zip");
+        }
+
 
         [HttpPost]
         public async Task<IActionResult> GuardarArchivos(string rutaDestino, List<long> ids)
@@ -87,8 +193,18 @@ namespace ArchivosNas.Controllers
             return RedirectToAction("Index");
         }
 
-        public async Task<IActionResult> DescargarZip(List<long> ids)
+        public async Task<IActionResult> DescargarZip()
         {
+            var encontradosJson = HttpContext.Session.GetString("EncontradosCache");
+
+            if (string.IsNullOrEmpty(encontradosJson))
+                return BadRequest("No hay datos en sesión");
+
+            var encontrados = System.Text.Json.JsonSerializer
+                .Deserialize<List<ResultadoBusquedaDto>>(encontradosJson);
+
+            var ids = encontrados.Select(x => x.Id).ToList();
+
             var archivos = await _indexadosData.ObtenerPorIds(ids);
 
             var zipPath = Path.Combine(Path.GetTempPath(), $"archivos_{Guid.NewGuid()}.zip");

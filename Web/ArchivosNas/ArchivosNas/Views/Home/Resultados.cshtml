@@ -10,21 +10,14 @@
 <p>Total encontrados: @ViewBag.Total</p>
 
 <form method="post" asp-action="DescargarZip">
-
-    @foreach (var item in Model)
-    {
-        <input type="hidden" name="ids" value="@item.Id" />
-    }
-
     <button class="btn btn-success">
         Descargar todos
     </button>
-
 </form>
+
 <hr />
 
 <table class="table table-bordered">
-
     <thead>
         <tr>
             <th>Id</th>
@@ -38,31 +31,130 @@
     </thead>
 
     <tbody>
-
         @foreach (var item in Model)
         {
             <tr>
-
                 <td>@item.Id</td>
                 <td>@item.NombreArchivo</td>
                 <td>@item.Extension</td>
                 <td>@item.Prefijo</td>
                 <td>@item.NumeroFactura</td>
                 <td>@item.RutaCompleta</td>
-
                 <td>
                     <a asp-action="AbrirArchivo"
-                       asp-controller="Home"
-                       asp-route-ruta="@item.RutaCompleta"
-                       asp-route-nombre="@item.NombreArchivo"
-                       class="btn btn-success">
+                           asp-controller="Home"
+                           asp-route-ruta="@item.RutaCompleta"
+                           asp-route-nombre="@item.NombreArchivo"
+                           class="btn btn-success">
                         Abrir
                     </a>
                 </td>
-
             </tr>
         }
-
     </tbody>
-
 </table>
+
+<hr />
+
+@{
+    int total = ViewBag.Total ?? 0;
+    int pagina = ViewBag.Pagina ?? 1;
+    int pageSize = ViewBag.PageSize ?? 20;
+
+    int totalPaginas = (int)Math.Ceiling((double)total / pageSize);
+
+    int inicio = Math.Max(1, pagina - 2);
+    int fin = Math.Min(totalPaginas, pagina + 2);
+}
+
+<nav>
+    <ul class="pagination">
+
+        <!-- Anterior -->
+        @if (pagina > 1)
+        {
+            <li class="page-item">
+                <form method="post" asp-action="Buscar">
+                    <input type="hidden" name="Pagina" value="@(pagina - 1)" />
+                    <input type="hidden" name="NombreArchivo" value="@ViewBag.NombreArchivo" />
+                    <input type="hidden" name="Prefijo" value="@ViewBag.Prefijo" />
+                    <input type="hidden" name="NumeroFactura" value="@ViewBag.NumeroFactura" />
+                    <button class="page-link">Anterior</button>
+                </form>
+            </li>
+        }
+
+        <!-- Primera página -->
+        <li class="page-item @(pagina == 1 ? "active" : "")">
+            <form method="post" asp-action="Buscar">
+                <input type="hidden" name="Pagina" value="1" />
+                <input type="hidden" name="NombreArchivo" value="@ViewBag.NombreArchivo" />
+                <input type="hidden" name="Prefijo" value="@ViewBag.Prefijo" />
+                <input type="hidden" name="NumeroFactura" value="@ViewBag.NumeroFactura" />
+                <button class="page-link">1</button>
+            </form>
+        </li>
+
+        <!-- ... antes -->
+        @if (inicio > 2)
+        {
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+        }
+
+        <!-- Páginas centrales -->
+        @for (int i = inicio; i <= fin; i++)
+        {
+            if (i != 1 && i != totalPaginas)
+            {
+                <li class="page-item @(i == pagina ? "active" : "")">
+                    <form method="post" asp-action="Buscar">
+                        <input type="hidden" name="Pagina" value="@i" />
+                        <input type="hidden" name="NombreArchivo" value="@ViewBag.NombreArchivo" />
+                        <input type="hidden" name="Prefijo" value="@ViewBag.Prefijo" />
+                        <input type="hidden" name="NumeroFactura" value="@ViewBag.NumeroFactura" />
+                        <button class="page-link">@i</button>
+                    </form>
+                </li>
+            }
+        }
+
+        <!-- ... después -->
+        @if (fin < totalPaginas - 1)
+        {
+            <li class="page-item disabled">
+                <span class="page-link">...</span>
+            </li>
+        }
+
+        <!-- Última página -->
+        @if (totalPaginas > 1)
+        {
+            <li class="page-item @(pagina == totalPaginas ? "active" : "")">
+                <form method="post" asp-action="Buscar">
+                    <input type="hidden" name="Pagina" value="@totalPaginas" />
+                    <input type="hidden" name="NombreArchivo" value="@ViewBag.NombreArchivo" />
+                    <input type="hidden" name="Prefijo" value="@ViewBag.Prefijo" />
+                    <input type="hidden" name="NumeroFactura" value="@ViewBag.NumeroFactura" />
+                    <button class="page-link">@totalPaginas</button>
+                </form>
+            </li>
+        }
+
+        <!-- Siguiente -->
+        @if (pagina < totalPaginas)
+        {
+            <li class="page-item">
+                <form method="post" asp-action="Buscar">
+                    <input type="hidden" name="Pagina" value="@(pagina + 1)" />
+                    <input type="hidden" name="NombreArchivo" value="@ViewBag.NombreArchivo" />
+                    <input type="hidden" name="Prefijo" value="@ViewBag.Prefijo" />
+                    <input type="hidden" name="NumeroFactura" value="@ViewBag.NumeroFactura" />
+                    <button class="page-link">Siguiente</button>
+                </form>
+            </li>
+        }
+
+    </ul>
+</nav>

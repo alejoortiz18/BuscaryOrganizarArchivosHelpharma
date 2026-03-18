@@ -1,4 +1,5 @@
-﻿@model ArchivosNas.Models.Dto.ResultadoListadoDto
+﻿@using ArchivosNas.Models.Dto
+@model ArchivosNas.Models.Dto.ResultadoListadoDto
 
 <hr />
 <a href="@Url.Action("Index", "Home")" class="btn btn-secondary mb-3">
@@ -8,7 +9,7 @@
 <h3>Resultado del listado</h3>
 
 <p>
-    Archivos encontrados: <b>@Model.Encontrados.Count</b>
+    Archivos encontrados: <b>@ViewBag.Total</b>
 </p>
 
 <p class="text-danger">
@@ -17,24 +18,25 @@
 
 <hr />
 
-<form method="post" asp-action="DescargarZip">
+<div class="d-flex align-items-center gap-3">
 
-    @foreach (var item in Model.Encontrados)
-    {
-        <input type="hidden" name="ids" value="@item.Id" />
-    }
-
-    <button class="btn btn-success">
+    <button type="button" class="btn btn-success" onclick="iniciarDescarga()">
         Descargar todos
     </button>
 
-</form>
+    <div class="progress" style="width:300px;">
+        <div id="barraProgreso" class="progress-bar" role="progressbar" style="width: 0%">
+            0%
+        </div>
+    </div>
+
+</div>
+
 <hr />
 
 <h4>Encontrados</h4>
 
 <table class="table table-bordered">
-
     <thead>
         <tr>
             <th>Id</th>
@@ -46,28 +48,167 @@
     </thead>
 
     <tbody>
-
         @foreach (var item in Model.Encontrados)
         {
             <tr>
-
                 <td>@item.Id</td>
                 <td>@item.NombreArchivo</td>
                 <td>@item.Prefijo</td>
                 <td>@item.NumeroFactura</td>
-
                 <td>
                     <a asp-action="AbrirArchivo"
-                       asp-controller="Home"
-                       asp-route-ruta="@item.RutaCompleta"
-                       asp-route-nombre="@item.NombreArchivo"
-                       class="btn btn-success">
+                           asp-controller="Home"
+                           asp-route-ruta="@item.RutaCompleta"
+                           asp-route-nombre="@item.NombreArchivo"
+                           class="btn btn-success">
                         Abrir
                     </a>
                 </td>
             </tr>
         }
-
     </tbody>
-
 </table>
+
+<hr />
+
+@{
+    int total = ViewBag.Total ?? 0;
+    int pagina = ViewBag.Pagina ?? 1;
+    int pageSize = ViewBag.PageSize ?? 20;
+
+    int totalPaginas = (int)Math.Ceiling((double)total / pageSize);
+
+    int inicio = Math.Max(1, pagina - 2);
+    int fin = Math.Min(totalPaginas, pagina + 2);
+}
+
+<nav>
+    <ul class="pagination">
+
+        @if (pagina > 1)
+        {
+            <li class="page-item">
+                <form method="post" asp-action="ProcesarListado">
+                    <input type="hidden" name="pagina" value="@(pagina - 1)" />
+
+                    @foreach (var f in ViewBag.Facturas as List<string>)
+                    {
+                        <input type="hidden" name="Facturas" value="@f" />
+                    }
+
+                    <button class="page-link">Anterior</button>
+                </form>
+            </li>
+        }
+
+        <li class="page-item @(pagina == 1 ? "active" : "")">
+            <form method="post" asp-action="ProcesarListado">
+                <input type="hidden" name="pagina" value="1" />
+
+                @foreach (var f in ViewBag.Facturas as List<string>)
+                {
+                    <input type="hidden" name="Facturas" value="@f" />
+                }
+
+                <button class="page-link">1</button>
+            </form>
+        </li>
+
+        @if (inicio > 2)
+        {
+            <li class="page-item disabled"><span class="page-link">...</span></li>
+        }
+
+        @for (int i = inicio; i <= fin; i++)
+        {
+            if (i != 1 && i != totalPaginas)
+            {
+                <li class="page-item @(i == pagina ? "active" : "")">
+                    <form method="post" asp-action="ProcesarListado">
+                        <input type="hidden" name="pagina" value="@i" />
+
+                        @foreach (var f in ViewBag.Facturas as List<string>)
+                        {
+                            <input type="hidden" name="Facturas" value="@f" />
+                        }
+
+                        <button class="page-link">@i</button>
+                    </form>
+                </li>
+            }
+        }
+
+        @if (fin < totalPaginas - 1)
+        {
+            <li class="page-item disabled"><span class="page-link">...</span></li>
+        }
+
+        @if (totalPaginas > 1)
+        {
+            <li class="page-item @(pagina == totalPaginas ? "active" : "")">
+                <form method="post" asp-action="ProcesarListado">
+                    <input type="hidden" name="pagina" value="@totalPaginas" />
+
+                    @foreach (var f in ViewBag.Facturas as List<string>)
+                    {
+                        <input type="hidden" name="Facturas" value="@f" />
+                    }
+
+                    <button class="page-link">@totalPaginas</button>
+                </form>
+            </li>
+        }
+
+        @if (pagina < totalPaginas)
+        {
+            <li class="page-item">
+                <form method="post" asp-action="ProcesarListado">
+                    <input type="hidden" name="pagina" value="@(pagina + 1)" />
+
+                    @foreach (var f in ViewBag.Facturas as List<string>)
+                    {
+                        <input type="hidden" name="Facturas" value="@f" />
+                    }
+
+                    <button class="page-link">Siguiente</button>
+                </form>
+            </li>
+        }
+
+    </ul>
+</nav>
+
+
+<script>
+    let jobId = null;
+    let intervalo;
+
+    function iniciarDescarga() {
+
+        fetch('/Home/IniciarZip', { method: 'POST' })
+            .then(r => r.json())
+            .then(data => {
+                jobId = data.jobId;
+                intervalo = setInterval(actualizarProgreso, 500);
+            });
+    }
+
+    function actualizarProgreso() {
+
+        fetch('/Home/ProgresoZip?jobId=' + jobId)
+            .then(r => r.json())
+            .then(data => {
+
+                let barra = document.getElementById("barraProgreso");
+
+                barra.style.width = data.porcentaje + "%";
+                barra.innerText = data.porcentaje + "%";
+
+                if (data.porcentaje >= 100) {
+                    clearInterval(intervalo);
+
+                    window.location = '/Home/DescargarZipFinal?jobId=' + jobId;
+                }
+            });
+    }
+</script>

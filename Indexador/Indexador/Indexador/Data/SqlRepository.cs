@@ -134,32 +134,34 @@ namespace Indexador.Data
             await connection.OpenAsync();
 
             var sql = @"
-                MERGE ArchivosIndexados AS target
-                USING ArchivosIndexados_Staging AS source
-                ON target.RutaHash = HASHBYTES('SHA2_256', source.RutaCompleta)
+                    INSERT INTO ArchivosIndexados
+                    (
+                        RutaCompleta,
+                        NombreArchivo,
+                        Extension,
+                        Prefijo,
+                        NumeroFactura
+                    )
+                    SELECT
+                        s.RutaCompleta,
+                        s.NombreArchivo,
+                        LEFT(s.Extension, 20),
+                        s.Prefijo,
+                        s.NumeroFactura
+                    FROM ArchivosIndexados_Staging s
+                    WHERE NOT EXISTS
+                    (
+                        SELECT 1
+                        FROM ArchivosIndexados t
+                        WHERE t.RutaHash = HASHBYTES('SHA2_256', s.RutaCompleta)
+                    );
 
-                WHEN NOT MATCHED THEN
-                INSERT
-                (
-                    RutaCompleta,
-                    NombreArchivo,
-                    Extension,
-                    Prefijo,
-                    NumeroFactura
-                )
-                VALUES
-                (
-                    source.RutaCompleta,
-                    source.NombreArchivo,
-                    LEFT(source.Extension, 20),
-                    source.Prefijo,
-                    source.NumeroFactura
-                );
-
-                TRUNCATE TABLE ArchivosIndexados_Staging;
-                ";
+                    TRUNCATE TABLE ArchivosIndexados_Staging;
+                    ";
 
             using var cmd = new SqlCommand(sql, connection);
+            cmd.CommandTimeout = 0;
+
             await cmd.ExecuteNonQueryAsync();
         }
     }

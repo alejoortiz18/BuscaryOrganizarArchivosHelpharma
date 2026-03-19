@@ -9,16 +9,24 @@
 
 <p>Total encontrados: @ViewBag.Total</p>
 
-<form method="post" asp-action="DescargarZip">
+<div class="d-flex align-items-center gap-3">
 
-    <input type="hidden" name="NombreArchivo" value="@ViewBag.NombreArchivo" />
-    <input type="hidden" name="Prefijo" value="@ViewBag.Prefijo" />
-    <input type="hidden" name="NumeroFactura" value="@ViewBag.NumeroFactura" />
-
-    <button class="btn btn-success">
+    <button type="button" class="btn btn-success" onclick="iniciarDescarga()">
         Descargar todos
     </button>
-</form>
+
+    <div class="progress" style="width:300px;">
+        <div id="barraProgreso" class="progress-bar" role="progressbar" style="width: 0%">
+            0%
+        </div>
+    </div>
+
+</div>
+
+<!-- 🔥 Inputs ocultos con filtros -->
+<input type="hidden" id="fNombreArchivo" value="@ViewBag.NombreArchivo" />
+<input type="hidden" id="fPrefijo" value="@ViewBag.Prefijo" />
+<input type="hidden" id="fNumeroFactura" value="@ViewBag.NumeroFactura" />
 
 
 <hr />
@@ -164,3 +172,70 @@
 
     </ul>
 </nav>
+
+<script>
+    let jobId = null;
+    let intervalo;
+
+    function iniciarDescarga() {
+
+        const data = {
+            NombreArchivo: document.getElementById("fNombreArchivo")?.value || "",
+            Prefijo: document.getElementById("fPrefijo")?.value || "",
+            NumeroFactura: document.getElementById("fNumeroFactura")?.value || ""
+        };
+
+        fetch('/Home/IniciarZipDesdeBusqueda', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(r => {
+            if (!r.ok) throw new Error("Error iniciando descarga");
+            return r.json();
+        })
+        .then(data => {
+            jobId = data.jobId;
+
+            if (!jobId) {
+                console.error("No se recibió jobId");
+                return;
+            }
+
+            intervalo = setInterval(actualizarProgreso, 500);
+        })
+        .catch(err => {
+            console.error(err);
+            alert("Error iniciando la descarga");
+        });
+    }
+
+    function actualizarProgreso() {
+
+        if (!jobId) return;
+
+        fetch('/Home/ProgresoZip?jobId=' + jobId)
+            .then(r => r.json())
+            .then(data => {
+
+                let barra = document.getElementById("barraProgreso");
+
+                if (!barra) return;
+
+                barra.style.width = data.porcentaje + "%";
+                barra.innerText = data.porcentaje + "%";
+
+                if (data.porcentaje >= 100) {
+                    clearInterval(intervalo);
+
+                    window.location = '/Home/DescargarZipFinal?jobId=' + jobId;
+                }
+            })
+            .catch(err => {
+                console.error("Error consultando progreso", err);
+                clearInterval(intervalo);
+            });
+    }
+</script>

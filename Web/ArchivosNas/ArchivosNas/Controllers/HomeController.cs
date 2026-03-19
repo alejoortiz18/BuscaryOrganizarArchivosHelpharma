@@ -222,6 +222,39 @@ namespace ArchivosNas.Controllers
         }
 
         [HttpPost]
+        public async Task<IActionResult> DescargarZipResultado(BusquedaDto filtro)
+        {
+            var archivos = await _indexadosData.BuscarTodos(filtro);
+
+            if (archivos == null || !archivos.Any())
+                return BadRequest("No hay archivos para descargar");
+
+            using (var memoria = new MemoryStream())
+            {
+                using (var zip = new System.IO.Compression.ZipArchive(memoria, System.IO.Compression.ZipArchiveMode.Create, true))
+                {
+                    foreach (var item in archivos)
+                    {
+                        try
+                        {
+                            AgregarArchivoAlZip(zip, item.RutaCompleta,item.NombreArchivo);
+
+                        }
+                        catch
+                        {
+                            // 🔥 NO rompe todo el proceso por un archivo dañado
+                            continue;
+                        }
+                    }
+                }
+
+                memoria.Position = 0;
+
+                return File(memoria.ToArray(), "application/zip", "Archivos.zip");
+            }
+        }
+
+        [HttpPost]
         public async Task<IActionResult> DescargarZip(BusquedaDto filtro)
         {
             var archivos = await _indexadosData.BuscarTodos(filtro);
@@ -329,6 +362,47 @@ namespace ArchivosNas.Controllers
             var bytes = await System.IO.File.ReadAllBytesAsync(zipPath);
 
             return File(bytes, "application/zip", "radicacion.zip");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> IniciarZipDesdeBusqueda([FromBody] BusquedaDto filtro)
+        {
+            var jobId = Guid.NewGuid().ToString();
+
+            progresoPorJob[jobId] = 0;
+
+            var archivos = await _indexadosData.BuscarTodos(filtro);
+
+            var zipPath = Path.Combine(Path.GetTempPath(), $"archivos_{jobId}.zip");
+            zipPorJob[jobId] = zipPath;
+
+            _ = Task.Run(() =>
+            {
+                using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+                {
+                    int total = archivos.Count;
+                    int actual = 0;
+
+                    foreach (var archivo in archivos)
+                    {
+                        try
+                        {
+                            AgregarArchivoAlZip(zip, archivo.RutaCompleta, archivo.NombreArchivo);
+                        }
+                        catch
+                        {
+                            continue;
+                        }
+
+                        actual++;
+                        progresoPorJob[jobId] = (int)((actual * 100.0) / total);
+                    }
+                }
+
+                progresoPorJob[jobId] = 100;
+            });
+
+            return Json(new { jobId });
         }
 
 

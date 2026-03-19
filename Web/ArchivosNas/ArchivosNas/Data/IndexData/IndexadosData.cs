@@ -157,5 +157,31 @@ namespace ArchivosNas.Data.IndexData
                 })
                 .ToListAsync();
         }
+
+        public async Task<List<ResultadoBusquedaDto>> BuscarTodos(BusquedaDto filtro)
+        {
+            var query = _context.ArchivosIndexados.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(filtro.NombreArchivo))
+                query = query.Where(x => x.NombreArchivo.StartsWith(filtro.NombreArchivo));
+
+            if (!string.IsNullOrWhiteSpace(filtro.Prefijo))
+                query = query.Where(x => x.Prefijo == filtro.Prefijo);
+
+            if (!string.IsNullOrWhiteSpace(filtro.NumeroFactura))
+                query = query.Where(x => x.NumeroFactura == filtro.NumeroFactura);
+
+            return await query
+                .Select(x => new ResultadoBusquedaDto
+                {
+                    Id = x.Id,
+                    RutaCompleta = x.RutaCompleta,
+                    NombreArchivo = x.NombreArchivo,
+                    Extension = x.Extension,
+                    Prefijo = x.Prefijo,
+                    NumeroFactura = x.NumeroFactura
+                })
+                .ToListAsync();
+        }
     }
 }

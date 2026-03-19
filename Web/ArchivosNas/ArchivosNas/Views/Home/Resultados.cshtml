@@ -10,10 +10,16 @@
 <p>Total encontrados: @ViewBag.Total</p>
 
 <form method="post" asp-action="DescargarZip">
+
+    <input type="hidden" name="NombreArchivo" value="@ViewBag.NombreArchivo" />
+    <input type="hidden" name="Prefijo" value="@ViewBag.Prefijo" />
+    <input type="hidden" name="NumeroFactura" value="@ViewBag.NumeroFactura" />
+
     <button class="btn btn-success">
         Descargar todos
     </button>
 </form>
+
 
 <hr />
 

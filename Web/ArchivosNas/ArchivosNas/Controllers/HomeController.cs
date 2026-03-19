@@ -46,6 +46,8 @@ namespace ArchivosNas.Controllers
             return View("Resultados", resultado.resultados);
         }
 
+      
+
         [HttpPost]
         public async Task<IActionResult> ProcesarListado(ProcesarListadoDto model, int pagina = 1, List<string> Facturas = null)
         {
@@ -142,10 +144,7 @@ namespace ArchivosNas.Controllers
 
                     foreach (var archivo in archivos)
                     {
-                        if (System.IO.File.Exists(archivo.RutaCompleta))
-                        {
-                            zip.CreateEntryFromFile(archivo.RutaCompleta, archivo.NombreArchivo);
-                        }
+                        AgregarArchivoAlZip(zip, archivo.RutaCompleta, archivo.NombreArchivo);
 
                         actual++;
                         progresoPorJob[jobId] = (int)((actual * 100.0) / total);
@@ -213,12 +212,27 @@ namespace ArchivosNas.Controllers
             {
                 foreach (var archivo in archivos)
                 {
-                    if (System.IO.File.Exists(archivo.RutaCompleta))
-                    {
-                        zip.CreateEntryFromFile(
-                            archivo.RutaCompleta,
-                            archivo.NombreArchivo);
-                    }
+                    AgregarArchivoAlZip(zip, archivo.RutaCompleta, archivo.NombreArchivo);
+                }
+            }
+
+            var bytes = await System.IO.File.ReadAllBytesAsync(zipPath);
+
+            return File(bytes, "application/zip", "archivos.zip");
+        }
+
+        [HttpPost]
+        public async Task<IActionResult> DescargarZip(BusquedaDto filtro)
+        {
+            var archivos = await _indexadosData.BuscarTodos(filtro);
+
+            var zipPath = Path.Combine(Path.GetTempPath(), $"archivos_{Guid.NewGuid()}.zip");
+
+            using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+            {
+                foreach (var archivo in archivos)
+                {
+                    AgregarArchivoAlZip(zip, archivo.RutaCompleta, archivo.NombreArchivo);
                 }
             }
 
@@ -291,24 +305,22 @@ namespace ArchivosNas.Controllers
 
                     foreach (var archivo in archivosFactura)
                     {
-                        if (!System.IO.File.Exists(archivo.RutaCompleta))
-                            continue;
-
                         var nombre = archivo.NombreArchivo.ToLower();
                         var ext = archivo.Extension.ToLower();
 
                         bool esJson = ext == ".json";
                         bool esCuv = nombre.Contains("-cuv");
 
+                        // 🔥 SI VA EN CARPETA
                         if (nombreCarpeta != null && (esJson || esCuv))
                         {
                             var rutaZip = $"{nombreCarpeta}/{archivo.NombreArchivo}";
-
-                            zip.CreateEntryFromFile(archivo.RutaCompleta, rutaZip);
+                            AgregarArchivoAlZip(zip, archivo.RutaCompleta, rutaZip);
                         }
                         else
                         {
-                            zip.CreateEntryFromFile(archivo.RutaCompleta, archivo.NombreArchivo);
+                            // 🔥 NORMAL (sin carpeta)
+                            AgregarArchivoAlZip(zip, archivo.RutaCompleta, archivo.NombreArchivo);
                         }
                     }
                 }
@@ -317,6 +329,52 @@ namespace ArchivosNas.Controllers
             var bytes = await System.IO.File.ReadAllBytesAsync(zipPath);
 
             return File(bytes, "application/zip", "radicacion.zip");
+        }
+
+
+        private void AgregarArchivoAlZip(ZipArchive zipDestino, string rutaCompleta, string nombreDestino)
+        {
+            try
+            {
+                if (rutaCompleta.Contains("|"))
+                {
+                    var partes = rutaCompleta.Split('|');
+
+                    var rutaZip = partes[0];
+                    var rutaInterna = partes[1].Replace("\\", "/");
+
+                    if (!System.IO.File.Exists(rutaZip))
+                        return;
+
+                    using (var zipOrigen = ZipFile.OpenRead(rutaZip))
+                    {
+                        var entry = zipOrigen.Entries
+                            .FirstOrDefault(e => e.FullName.Replace("\\", "/") == rutaInterna);
+
+                        if (entry == null)
+                            return;
+
+                        var nuevaEntrada = zipDestino.CreateEntry(nombreDestino);
+
+                        using (var streamOrigen = entry.Open())
+                        using (var streamDestino = nuevaEntrada.Open())
+                        {
+                            streamOrigen.CopyTo(streamDestino);
+                        }
+                    }
+                }
+                else
+                {
+                    if (!System.IO.File.Exists(rutaCompleta))
+                        return;
+
+                    zipDestino.CreateEntryFromFile(rutaCompleta, nombreDestino);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error procesando archivo: {rutaCompleta} - {ex.Message}");
+            }
         }
     }
 }

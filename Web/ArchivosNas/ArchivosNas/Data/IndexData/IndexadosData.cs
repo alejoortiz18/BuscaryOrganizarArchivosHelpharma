@@ -158,6 +158,22 @@ namespace ArchivosNas.Data.IndexData
                 .ToListAsync();
         }
 
+        public async Task<List<ResultadoBusquedaDto>> BuscarPorNombreArchivo(List<string> facturas)
+        {
+            return await _context.ArchivosIndexados
+                .Where(x => facturas.Contains(x.NombreArchivo))
+                .Select(x => new ResultadoBusquedaDto
+                {
+                    Id = x.Id,
+                    RutaCompleta = x.RutaCompleta,
+                    NombreArchivo = x.NombreArchivo,
+                    Extension = x.Extension,
+                    Prefijo = x.Prefijo,
+                    NumeroFactura = x.NumeroFactura
+                })
+                .ToListAsync();
+        }
+
         public async Task<List<ResultadoBusquedaDto>> BuscarTodos(BusquedaDto filtro)
         {
             var query = _context.ArchivosIndexados.AsQueryable();

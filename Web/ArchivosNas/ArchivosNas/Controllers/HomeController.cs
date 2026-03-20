@@ -296,6 +296,75 @@ namespace ArchivosNas.Controllers
         }
 
         [HttpPost]
+        public async Task<IActionResult> ListadoNombre(ProcesarListadoDto model)
+        {
+            if (model.Archivo == null || model.Archivo.Length == 0)
+                return BadRequest("Debe subir archivo");
+
+            var facturas = new List<string>();
+
+            using (var reader = new StreamReader(model.Archivo.OpenReadStream()))
+            {
+                while (!reader.EndOfStream)
+                {
+                    var linea = await reader.ReadLineAsync();
+
+                    if (!string.IsNullOrWhiteSpace(linea))
+                        facturas.Add(linea.Trim());
+                }
+            }
+
+            var archivos = await _indexadosData.BuscarPorNombreArchivo(facturas);
+
+            var zipPath = Path.Combine(Path.GetTempPath(), $"radicacion_{Guid.NewGuid()}.zip");
+
+            using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+            {
+                foreach (var factura in facturas)
+                {
+                    var archivosFactura = archivos
+                        .Where(x => x.NombreArchivo == factura)
+                        .ToList();
+
+                    var json = archivosFactura
+                        .FirstOrDefault(x => x.Extension.ToLower() == ".json");
+
+                    string? nombreCarpeta = null;
+
+                    if (json != null)
+                    {
+                        nombreCarpeta = Path.GetFileNameWithoutExtension(json.NombreArchivo);
+                    }
+
+                    foreach (var archivo in archivosFactura)
+                    {
+                        var nombre = archivo.NombreArchivo.ToLower();
+                        var ext = archivo.Extension.ToLower();
+
+                        bool esJson = ext == ".json";
+                        bool esCuv = nombre.Contains("-cuv");
+
+                        // 🔥 SI VA EN CARPETA
+                        if (nombreCarpeta != null && (esJson || esCuv))
+                        {
+                            var rutaZip = $"{nombreCarpeta}/{archivo.NombreArchivo}";
+                            AgregarArchivoAlZip(zip, archivo.RutaCompleta, rutaZip);
+                        }
+                        else
+                        {
+                            // 🔥 NORMAL (sin carpeta)
+                            AgregarArchivoAlZip(zip, archivo.RutaCompleta, archivo.NombreArchivo);
+                        }
+                    }
+                }
+            }
+
+            var bytes = await System.IO.File.ReadAllBytesAsync(zipPath);
+
+            return File(bytes, "application/zip", "radicacion.zip");
+        }
+
+        [HttpPost]
         public async Task<IActionResult> OrganizarRadicacion(ProcesarListadoDto model)
         {
             if (model.Archivo == null || model.Archivo.Length == 0)

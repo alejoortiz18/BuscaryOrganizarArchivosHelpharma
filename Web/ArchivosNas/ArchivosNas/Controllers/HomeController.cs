@@ -295,6 +295,7 @@ namespace ArchivosNas.Controllers
             return File(bytes, "application/octet-stream", nombre);
         }
 
+
         [HttpPost]
         public async Task<IActionResult> ListadoNombre(ProcesarListadoDto model)
         {
@@ -317,6 +318,9 @@ namespace ArchivosNas.Controllers
             var archivos = await _indexadosData.BuscarPorNombreArchivo(facturas);
 
             var zipPath = Path.Combine(Path.GetTempPath(), $"radicacion_{Guid.NewGuid()}.zip");
+
+            // 🔥 Control de ZIPs ya agregados (para evitar duplicados)
+            var zipsAgregados = new HashSet<string>();
 
             using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
             {
@@ -344,16 +348,37 @@ namespace ArchivosNas.Controllers
                         bool esJson = ext == ".json";
                         bool esCuv = nombre.Contains("-cuv");
 
-                        // 🔥 SI VA EN CARPETA
-                        if (nombreCarpeta != null && (esJson || esCuv))
+                        var rutaDestino = (nombreCarpeta != null && (esJson || esCuv))
+                            ? $"{nombreCarpeta}/{archivo.NombreArchivo}"
+                            : archivo.NombreArchivo;
+
+                        // 🔥 CASO: archivo viene dentro de un ZIP (contiene "|")
+                        if (archivo.RutaCompleta.Contains("|"))
                         {
-                            var rutaZip = $"{nombreCarpeta}/{archivo.NombreArchivo}";
-                            AgregarArchivoAlZip(zip, archivo.RutaCompleta, rutaZip);
+                            var rutaZipReal = archivo.RutaCompleta.Split('|')[0];
+                            var existe = System.IO.File.Exists(rutaZipReal);
+
+                            if (System.IO.File.Exists(rutaZipReal) && !zipsAgregados.Contains(rutaZipReal))
+                            {
+                                var nombreZip = Path.GetFileName(rutaZipReal);
+
+                                var destinoZip = (nombreCarpeta != null && (esJson || esCuv))
+                                    ? $"{nombreCarpeta}/{nombreZip}"
+                                    : nombreZip;
+
+                                AgregarArchivoAlZip(zip, rutaZipReal, destinoZip);
+
+                                // 🔥 Marcar como agregado
+                                zipsAgregados.Add(rutaZipReal);
+                            }
+
+                            continue;
                         }
-                        else
+
+                        // 🔥 CASO NORMAL
+                        if (System.IO.File.Exists(archivo.RutaCompleta))
                         {
-                            // 🔥 NORMAL (sin carpeta)
-                            AgregarArchivoAlZip(zip, archivo.RutaCompleta, archivo.NombreArchivo);
+                            AgregarArchivoAlZip(zip, archivo.RutaCompleta, rutaDestino);
                         }
                     }
                 }
@@ -363,6 +388,8 @@ namespace ArchivosNas.Controllers
 
             return File(bytes, "application/zip", "radicacion.zip");
         }
+
+
 
         [HttpPost]
         public async Task<IActionResult> OrganizarRadicacion(ProcesarListadoDto model)

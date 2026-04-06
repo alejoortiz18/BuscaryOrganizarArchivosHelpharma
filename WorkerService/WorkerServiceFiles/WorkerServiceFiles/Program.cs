@@ -7,7 +7,7 @@ var builder = Host.CreateApplicationBuilder(args);
 
 builder.Services.AddWindowsService(options =>
 {
-    options.ServiceName = "IndexadorArchivosNAS";
+    options.ServiceName = "WorkerServiceFile";
 });
 
 builder.Services.Configure<NasSettings>(

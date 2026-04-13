@@ -1,0 +1,2 @@
+Sitio web para mostrar y ver todos los documentos indexados en el NAS, con la posibilidad de descargar cada uno de ellos. El sitio se actualizará automáticamente cada vez que se agregue un nuevo documento al NAS. Además, 
+se incluirá una función de búsqueda para facilitar la localización de documentos específicos. El diseño del sitio será sencillo y fácil de navegar, con una interfaz amigable para el usuario.

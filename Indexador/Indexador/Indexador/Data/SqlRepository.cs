@@ -164,5 +164,40 @@ namespace Indexador.Data
 
             await cmd.ExecuteNonQueryAsync();
         }
+
+        public async Task EjecutarMergeSPAsync()
+        {
+            using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            using var cmd = new SqlCommand("sp_MergeArchivosIndexados", connection);
+            cmd.CommandType = CommandType.StoredProcedure;
+            cmd.CommandTimeout = 0;
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task<DateTime> ObtenerUltimaEjecucionAsync()
+        {
+            using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            var cmd = new SqlCommand("SELECT UltimaEjecucion FROM IndexadorControl WHERE Id = 1", connection);
+
+            var result = await cmd.ExecuteScalarAsync();
+
+            return result != null ? (DateTime)result : DateTime.MinValue;
+        }
+
+        public async Task ActualizarUltimaEjecucionAsync(DateTime fecha)
+        {
+            using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            var cmd = new SqlCommand("UPDATE IndexadorControl SET UltimaEjecucion = @fecha WHERE Id = 1", connection);
+            cmd.Parameters.AddWithValue("@fecha", fecha);
+
+            await cmd.ExecuteNonQueryAsync();
+        }
     }
 }

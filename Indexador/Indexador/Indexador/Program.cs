@@ -1,16 +1,18 @@
 ﻿using Indexador.Data;
-using Indexador.Services;
 using Indexador.Models;
-using Indexador.Parsers;
+using Indexador.Services;
 
-var rutaTxt = @"C:\Users\alejandro.ortiz\Documents\helpharma\Desarrollos\python\todos\todos los indices.txt";
+var rutaBase = @"\\192.168.0.69\Informes";
 
 var repo = new SqlRepository();
 
-Console.WriteLine("=== INICIANDO INDEXACIÓN ===");
+Console.WriteLine("=== INICIANDO INDEXACIÓN DESDE NAS ===");
 
-var lineas = TxtReaderService.LeerLineas(rutaTxt);
-var archivos = ConsolidadosParser.Parsear(lineas);
+// 🔥 NUEVO FLUJO
+var ultimaEjecucion = await repo.ObtenerUltimaEjecucionAsync();
+
+var rutas = FileScannerService.EscanearArchivos(rutaBase, ultimaEjecucion);
+var archivos = FileParserService.ParsearArchivos(rutas);
 
 var lote = new List<ArchivoModel>(20000);
 
@@ -29,26 +31,25 @@ foreach (var archivo in archivos)
 
         contadorLotes++;
 
-        // 🔥 MERGE cada 100k (5 * 20k)
         if (contadorLotes % 5 == 0)
         {
-            Console.WriteLine("🔄 Ejecutando merge...");
-            await repo.EjecutarMergeAsync();
+            Console.WriteLine("🔄 Ejecutando merge SP...");
+            await repo.EjecutarMergeSPAsync();
         }
 
-        Console.WriteLine($"Insertados: {contador}");
+        Console.WriteLine($"Procesados: {contador}");
     }
 }
 
-// 🔚 último lote
+// Último lote
 if (lote.Count > 0)
 {
     await repo.BulkInsertAsync(lote);
 }
 
-// 🔥 MERGE FINAL
+// Merge final
 Console.WriteLine("🔄 Ejecutando merge final...");
-await repo.EjecutarMergeAsync();
+await repo.EjecutarMergeSPAsync();
 
 Console.WriteLine($"=== INDEXACIÓN TERMINADA ===");
 Console.WriteLine($"TOTAL: {contador}");

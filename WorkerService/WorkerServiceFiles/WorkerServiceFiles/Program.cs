@@ -4,7 +4,7 @@ using WorkerServiceFiles.Models;
 using WorkerServiceFiles.Services;
 
 var builder = Host.CreateApplicationBuilder(args);
-
+builder.Services.AddLogging();
 builder.Services.AddWindowsService(options =>
 {
     options.ServiceName = "WorkerServiceFile";

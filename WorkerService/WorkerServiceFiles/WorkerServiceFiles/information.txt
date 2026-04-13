@@ -1,0 +1,1 @@
+tiene problemas esta solucion de worker service, no se ejecuta, no se muestra nada en la consola, no se muestra ningún error, simplemente no hace nada, es como si el programa se ejecutara y terminara inmediatamente sin hacer nada.

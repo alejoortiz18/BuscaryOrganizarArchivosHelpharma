@@ -16,13 +16,13 @@ namespace WorkerServiceFiles.Helper
         {
             _networkName = networkName;
 
-            var netResource = new NetResource()
+            var netResource = new NetResource
             {
-                Scope = ResourceScope.GlobalNetwork,
-                ResourceType = ResourceType.Disk,
-                DisplayType = ResourceDisplaytype.Share,
-                RemoteName = networkName
+                lpRemoteName = networkName
             };
+
+            // 🔥 CERRAR CONEXIÓN PREVIA (CLAVE)
+            WNetCancelConnection2(networkName, 0, true);
 
             var result = WNetAddConnection2(
                 netResource,
@@ -54,12 +54,17 @@ namespace WorkerServiceFiles.Helper
             int flags,
             bool force);
 
+        [StructLayout(LayoutKind.Sequential)]
         private class NetResource
         {
-            public ResourceScope Scope;
-            public ResourceType ResourceType;
-            public ResourceDisplaytype DisplayType;
-            public string RemoteName;
+            public int dwScope = 2;
+            public int dwType = 1;
+            public int dwDisplayType = 3;
+            public int dwUsage = 1;
+            public string? lpLocalName = null;
+            public string? lpRemoteName = null;
+            public string? lpComment = null;
+            public string? lpProvider = null;
         }
 
         private enum ResourceScope

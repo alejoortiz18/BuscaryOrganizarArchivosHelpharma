@@ -1,34 +1,29 @@
 ﻿using Microsoft.Extensions.Options;
 using System.Collections.Concurrent;
 using System.IO.Compression;
-using WorkerServiceFiles.Data;
 using WorkerServiceFiles.Helper;
 using WorkerServiceFiles.Models;
 using WorkerServiceFiles.Models.ModelsFile;
-
 
 namespace WorkerServiceFiles.Services;
 
 public class FileIndexerService
 {
-    private readonly SqlRepository _repository;
     private readonly NasSettings _nasSettings;
     private readonly IndexerSettings _indexerSettings;
 
     private const int BatchSize = 500;
+    private const long MaxZipSizeBytes = 200_000_000; // 200 MB
 
     public FileIndexerService(
-        SqlRepository repository,
         IOptions<NasSettings> nasOptions,
         IOptions<IndexerSettings> indexerOptions)
     {
-        _repository = repository;
         _nasSettings = nasOptions.Value;
         _indexerSettings = indexerOptions.Value;
     }
 
-
-    public async Task IndexarArchivosAsync()
+    public async Task IndexarArchivosAsync(Func<List<ArchivoModel>, Task> bulkInsert, Func<Task> merge)
     {
         var rutaNas = _nasSettings.RutaNas;
 
@@ -37,6 +32,7 @@ public class FileIndexerService
 
         var cola = new BlockingCollection<ArchivoModel>(100000);
 
+        // 🔹 Escritor (consume cola y guarda en DB)
         var escritor = Task.Run(async () =>
         {
             var lote = new List<ArchivoModel>(BatchSize);
@@ -48,20 +44,20 @@ public class FileIndexerService
 
                 if (lote.Count >= BatchSize)
                 {
-                    await _repository.BulkInsertStagingAsync(lote);
+                    await bulkInsert(lote);
                     lote.Clear();
 
                     contadorLotes++;
 
                     if (contadorLotes % 20 == 0)
-                        await _repository.EjecutarMergeAsync();
+                        await merge();
                 }
             }
 
             if (lote.Count > 0)
-                await _repository.BulkInsertStagingAsync(lote);
+                await bulkInsert(lote);
 
-            await _repository.EjecutarMergeAsync();
+            await merge();
         });
 
         var opciones = new ParallelOptions
@@ -69,10 +65,11 @@ public class FileIndexerService
             MaxDegreeOfParallelism = Environment.ProcessorCount
         };
 
-        Parallel.ForEach(
+        // 🔹 Procesamiento paralelo REAL async
+        await Parallel.ForEachAsync(
             Directory.EnumerateDirectories(rutaNas),
             opciones,
-            carpeta =>
+            async (carpeta, ct) =>
             {
                 foreach (var rutaArchivo in EnumerarArchivosSeguro(carpeta))
                 {
@@ -80,11 +77,16 @@ public class FileIndexerService
                     {
                         foreach (var archivo in CrearModeloArchivo(rutaArchivo))
                         {
-                            cola.Add(archivo);
+                            cola.Add(archivo, ct);
                         }
                     }
-                    catch { }
+                    catch (Exception)
+                    {
+                        // Aquí puedes loguear si quieres
+                    }
                 }
+
+                await Task.CompletedTask;
             });
 
         cola.CompleteAdding();
@@ -97,9 +99,17 @@ public class FileIndexerService
         var nombreArchivo = Path.GetFileName(rutaArchivo);
         var extension = Path.GetExtension(rutaArchivo).ToLower();
 
+        // 🔹 Filtrar extensiones válidas
+        if (!_indexerSettings.ExtensionesFactura.Contains(extension))
+            yield break;
+
+        // 🔹 Evitar archivos basura
+        if (nombreArchivo.StartsWith("~$") || nombreArchivo.EndsWith(".tmp"))
+            yield break;
+
         var resultado = FileNameParser.ExtraerFactura(nombreArchivo);
 
-        // 1️⃣ Registrar el archivo físico (zip)
+        // 1️⃣ Archivo físico
         yield return new ArchivoModel
         {
             RutaCompleta = rutaArchivo,
@@ -109,7 +119,7 @@ public class FileIndexerService
             NumeroFactura = resultado.Numero
         };
 
-        // 2️⃣ Si es ZIP indexar contenido interno
+        // 2️⃣ ZIP
         if (extension == ".zip")
         {
             foreach (var archivoZip in EnumerarZip(rutaArchivo))
@@ -156,7 +166,19 @@ public class FileIndexerService
         if (!File.Exists(rutaZip))
             yield break;
 
-        ZipArchive archive;
+        // 🔹 Evitar ZIPs demasiado grandes
+        try
+        {
+            var fileInfo = new FileInfo(rutaZip);
+            if (fileInfo.Length > MaxZipSizeBytes)
+                yield break;
+        }
+        catch
+        {
+            yield break;
+        }
+
+        ZipArchive? archive = null;
 
         try
         {
@@ -169,7 +191,6 @@ public class FileIndexerService
 
         using (archive)
         {
-
             foreach (var entry in archive.Entries)
             {
                 if (string.IsNullOrEmpty(entry.Name))
@@ -177,6 +198,9 @@ public class FileIndexerService
 
                 var nombreArchivo = entry.Name;
                 var extension = Path.GetExtension(nombreArchivo).ToLower();
+
+                if (!_indexerSettings.ExtensionesFactura.Contains(extension))
+                    continue;
 
                 var resultado = FileNameParser.ExtraerFactura(nombreArchivo);
 

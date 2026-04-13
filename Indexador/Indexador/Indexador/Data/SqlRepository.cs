@@ -10,7 +10,7 @@ namespace Indexador.Data
     public class SqlRepository
     {
         private readonly string _connectionString =
-            "Server=ServiciosReleas\\SQLEXPRESS;Database=FilesNas;Trusted_Connection=True;TrustServerCertificate=True";
+            "Server=(localdb)\\MSSQLLocalDB;Database=FilesNas;Trusted_Connection=True;TrustServerCertificate=True";
 
         public async Task BulkInsertAsync(List<ArchivoModel> archivos)
         {

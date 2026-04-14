@@ -1,5 +1,6 @@
 using ArchivosNas.Data.IndexData;
 using ArchivosNas.Models.Entities;
+using ArchivosNas.Services;
 using Microsoft.EntityFrameworkCore;
 using System.Diagnostics;
 
@@ -10,6 +11,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllersWithViews();
 
 builder.Services.AddScoped<IndexadosData>();
+builder.Services.AddScoped<SoporteApiService>();
+builder.Services.AddScoped<SoporteFisicoApiService>();
+builder.Services.AddScoped<HttpClient>();
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("SqlServer")));
@@ -36,7 +40,7 @@ catch (Exception ex)
     Console.WriteLine("Error conectando a NAS: " + ex.Message);
 }
 
-// Configure the HTTP request pipeline.
+ //Configure the HTTP request pipeline.
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Home/Index");

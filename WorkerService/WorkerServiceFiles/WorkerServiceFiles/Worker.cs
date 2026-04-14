@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using WorkerServiceFiles.Helper;
+using WorkerServiceFiles.Models;
 using WorkerServiceFiles.Services;
 
 namespace WorkerServiceFiles
@@ -7,44 +9,41 @@ namespace WorkerServiceFiles
     {
         private readonly ILogger<Worker> _logger;
         private readonly FileWatcherService _watcher;
+        private readonly NasSettings _nasSettings;
 
         public Worker(
-            ILogger<Worker> logger,
-            FileWatcherService watcher)
+          ILogger<Worker> logger,
+          FileWatcherService watcher,
+          Microsoft.Extensions.Options.IOptions<NasSettings> nasOptions)
         {
             _logger = logger;
             _watcher = watcher;
+            _nasSettings = nasOptions.Value;
         }
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
             try
             {
-                var rutaNas = @"\\192.168.0.69\Informes";
+                _logger.LogInformation("Conectando a NAS...");
 
-                _logger.LogInformation("Conectando sesión SMB con NAS...");
+                using var nas = new NasConnection(
+                     @"\\192.168.0.69",
+                    new System.Net.NetworkCredential(
+                    "radicacion",
+                    _nasSettings.Password,
+                    "ServiciosRelease"
+)
+                );
 
-                Process.Start(new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = "/c net use \\\\192.168.0.69\\Informes /user:ServiciosRelease\\radicacion h3lph@rm@,+",
-                    CreateNoWindow = true,
-                    UseShellExecute = false
-                });
+                await EsperarDisponibilidadNAS(_nasSettings.RutaNas, stoppingToken);
 
-                await Task.Delay(2000, stoppingToken);
+                _logger.LogInformation("Iniciando indexación inicial...");
 
-                _logger.LogInformation("Esperando acceso a NAS: {ruta}", rutaNas);
+                await _watcher.IndexacionInicialAsync();
 
-                while (!Directory.Exists(rutaNas))
-                {
-                    _logger.LogWarning("NAS no disponible aún: {ruta}", rutaNas);
-                    await Task.Delay(10000, stoppingToken);
-                }
+                _logger.LogInformation("Indexación inicial completada");
 
-                _logger.LogInformation("NAS disponible");
-
-                // 🔹 SOLO iniciamos watcher
                 _watcher.IniciarWatcher();
 
                 _logger.LogInformation("Watcher activo, escuchando cambios...");
@@ -58,6 +57,30 @@ namespace WorkerServiceFiles
             {
                 _logger.LogError(ex, "Error crítico en el servicio IndexadorNAS");
             }
+        }
+
+
+        private async Task EsperarDisponibilidadNAS(string rutaNas, CancellationToken token)
+        {
+            _logger.LogInformation("Esperando acceso a NAS: {ruta}", rutaNas);
+
+            int intentos = 0;
+
+            while (!Directory.Exists(rutaNas))
+            {
+                intentos++;
+
+                if (intentos > 30)
+                {
+                    throw new Exception("NAS no disponible después de múltiples intentos");
+                }
+
+                _logger.LogWarning("NAS no disponible aún: {ruta}", rutaNas);
+
+                await Task.Delay(10000, token);
+            }
+
+            _logger.LogInformation("NAS disponible");
         }
     }
 }

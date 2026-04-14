@@ -33,27 +33,30 @@ namespace ArchivosNas.Data.IndexData
         {
             const int pageSize = 20;
 
-            var query = _context.ArchivosIndexados.AsQueryable();
+            var query = _context.ArchivosIndexados
+                .AsNoTracking()
+                .AsQueryable();
 
-            if (!string.IsNullOrEmpty(filtro.NombreArchivo))
+            if (!string.IsNullOrWhiteSpace(filtro.NombreArchivo))
             {
-                query = query.Where(x => x.NombreArchivo.Contains(filtro.NombreArchivo));
+                // SI necesitas contiene, usa esto (optimizado dentro de lo posible)
+                query = query.Where(x => x.NombreArchivo.StartsWith(filtro.NombreArchivo));
             }
 
-            if (!string.IsNullOrEmpty(filtro.Prefijo))
+            if (!string.IsNullOrWhiteSpace(filtro.Prefijo))
             {
                 query = query.Where(x => x.Prefijo == filtro.Prefijo);
             }
 
-            if (!string.IsNullOrEmpty(filtro.NumeroFactura))
+            if (!string.IsNullOrWhiteSpace(filtro.NumeroFactura))
             {
                 query = query.Where(x => x.NumeroFactura == filtro.NumeroFactura);
             }
 
-            var total = await query.CountAsync();
+            // 🔥 IMPORTANTE: orden antes de paginar (usa índice)
+            var baseQuery = query.OrderBy(x => x.Id);
 
-            var resultados = await query
-                .OrderBy(x => x.Id)
+            var resultados = await baseQuery
                 .Skip((filtro.Pagina - 1) * pageSize)
                 .Take(pageSize)
                 .Select(x => new ResultadoBusquedaDto
@@ -66,6 +69,17 @@ namespace ArchivosNas.Data.IndexData
                     NumeroFactura = x.NumeroFactura
                 })
                 .ToListAsync();
+
+            // 🔥 COUNT optimizado (solo si hace falta)
+            int total;
+            if (filtro.Pagina == 1 && resultados.Count < pageSize)
+            {
+                total = resultados.Count;
+            }
+            else
+            {
+                total = await query.CountAsync();
+            }
 
             return (resultados, total);
         }
@@ -132,6 +146,48 @@ namespace ArchivosNas.Data.IndexData
         {
             return await _context.ArchivosIndexados
                 .Where(x => facturas.Contains(x.NumeroFactura))
+                .Select(x => new ResultadoBusquedaDto
+                {
+                    Id = x.Id,
+                    RutaCompleta = x.RutaCompleta,
+                    NombreArchivo = x.NombreArchivo,
+                    Extension = x.Extension,
+                    Prefijo = x.Prefijo,
+                    NumeroFactura = x.NumeroFactura
+                })
+                .ToListAsync();
+        }
+
+        public async Task<List<ResultadoBusquedaDto>> BuscarPorNombreArchivo(List<string> facturas)
+        {
+            return await _context.ArchivosIndexados
+                .Where(x => facturas.Contains(x.NombreArchivo))
+                .Select(x => new ResultadoBusquedaDto
+                {
+                    Id = x.Id,
+                    RutaCompleta = x.RutaCompleta,
+                    NombreArchivo = x.NombreArchivo,
+                    Extension = x.Extension,
+                    Prefijo = x.Prefijo,
+                    NumeroFactura = x.NumeroFactura
+                })
+                .ToListAsync();
+        }
+
+        public async Task<List<ResultadoBusquedaDto>> BuscarTodos(BusquedaDto filtro)
+        {
+            var query = _context.ArchivosIndexados.AsQueryable();
+
+            if (!string.IsNullOrWhiteSpace(filtro.NombreArchivo))
+                query = query.Where(x => x.NombreArchivo.StartsWith(filtro.NombreArchivo));
+
+            if (!string.IsNullOrWhiteSpace(filtro.Prefijo))
+                query = query.Where(x => x.Prefijo == filtro.Prefijo);
+
+            if (!string.IsNullOrWhiteSpace(filtro.NumeroFactura))
+                query = query.Where(x => x.NumeroFactura == filtro.NumeroFactura);
+
+            return await query
                 .Select(x => new ResultadoBusquedaDto
                 {
                     Id = x.Id,

@@ -6,20 +6,17 @@ namespace WorkerServiceFiles.Services
 {
     public class FileWatcherService
     {
-        private readonly SqlRepository _repository;
+        private readonly IServiceScopeFactory _scopeFactory;
         private readonly NasSettings _nasSettings;
-        private readonly FileIndexerService _indexerService;
 
         private FileSystemWatcher? _watcher;
 
         public FileWatcherService(
-            SqlRepository repository,
-            FileIndexerService indexerService,
+            IServiceScopeFactory scopeFactory,
             IOptions<NasSettings> nasOptions)
         {
-            _repository = repository;
+            _scopeFactory = scopeFactory;
             _nasSettings = nasOptions.Value;
-            _indexerService = indexerService;
         }
 
         public void IniciarWatcher()
@@ -59,7 +56,10 @@ namespace WorkerServiceFiles.Services
             if (Directory.Exists(e.FullPath))
                 return;
 
-            await _repository.DeleteArchivoAsync(e.FullPath);
+            using var scope = _scopeFactory.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<SqlRepository>();
+
+            await repository.DeleteArchivoAsync(e.FullPath);
         }
 
         private async void OnRenamed(object sender, RenamedEventArgs e)
@@ -67,7 +67,10 @@ namespace WorkerServiceFiles.Services
             if (Directory.Exists(e.FullPath))
                 return;
 
-            await _repository.DeleteArchivoAsync(e.OldFullPath);
+            using var scope = _scopeFactory.CreateScope();
+            var repository = scope.ServiceProvider.GetRequiredService<SqlRepository>();
+
+            await repository.DeleteArchivoAsync(e.OldFullPath);
 
             await EsperarArchivoDisponible(e.FullPath);
 
@@ -78,9 +81,7 @@ namespace WorkerServiceFiles.Services
         {
             Console.WriteLine("Watcher error: " + e.GetException().Message);
 
-            // reiniciar watcher
             _watcher?.Dispose();
-
             IniciarWatcher();
         }
 
@@ -89,9 +90,14 @@ namespace WorkerServiceFiles.Services
             if (!File.Exists(rutaArchivo))
                 return;
 
-            foreach (var archivo in _indexerService.CrearModeloArchivo(rutaArchivo))
+            using var scope = _scopeFactory.CreateScope();
+
+            var repository = scope.ServiceProvider.GetRequiredService<SqlRepository>();
+            var indexerService = scope.ServiceProvider.GetRequiredService<FileIndexerService>();
+
+            foreach (var archivo in indexerService.CrearModeloArchivo(rutaArchivo))
             {
-                await _repository.InsertArchivoAsync(archivo);
+                await repository.InsertArchivoAsync(archivo);
             }
         }
 
@@ -112,6 +118,24 @@ namespace WorkerServiceFiles.Services
                     await Task.Delay(500);
                 }
             }
+        }
+
+        public async Task IndexacionInicialAsync()
+        {
+            using var scope = _scopeFactory.CreateScope();
+
+            var indexer = scope.ServiceProvider.GetRequiredService<FileIndexerService>();
+            var repository = scope.ServiceProvider.GetRequiredService<SqlRepository>();
+
+            await indexer.IndexarArchivosAsync(
+                async (lote) =>
+                {
+                    await repository.BulkInsertStagingAsync(lote);
+                },
+                async () =>
+                {
+                    await repository.EjecutarMergeAsync();
+                });
         }
     }
 }

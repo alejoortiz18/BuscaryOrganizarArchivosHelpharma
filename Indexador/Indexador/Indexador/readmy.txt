@@ -1,0 +1,2 @@
+este programa esta diseñado para reindexar los archivos de la compartida, 
+el registra la ultima ejecución y el resultado de la misma, para que se pueda llevar un control de las ejecuciones y los resultados obtenidos.

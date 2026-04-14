@@ -6,10 +6,15 @@ namespace Indexador.Services
 {
     public static class FileScannerService
     {
-        public static IEnumerable<string> EscanearArchivos(string rutaBase, DateTime ultimaEjecucion)
+        public static IEnumerable<string> EscanearArchivos(
+            string rutaBase,
+            string? ultimaRutaProcesada,
+            DateTime ultimaEjecucion)
         {
             var pendientes = new Stack<string>();
             pendientes.Push(rutaBase);
+
+            bool empezarAProcesar = string.IsNullOrEmpty(ultimaRutaProcesada);
 
             while (pendientes.Count > 0)
             {
@@ -18,54 +23,55 @@ namespace Indexador.Services
                 string[] subdirectorios = Array.Empty<string>();
                 string[] archivos = Array.Empty<string>();
 
-                // 🔥 Leer subdirectorios
                 try
                 {
                     subdirectorios = Directory.GetDirectories(carpetaActual);
+                    Array.Sort(subdirectorios);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Console.WriteLine($"⚠️ Error accediendo a carpetas: {carpetaActual}");
-                    Console.WriteLine(ex.Message);
                     continue;
                 }
 
-                // 🔥 Leer archivos
                 try
                 {
                     archivos = Directory.GetFiles(carpetaActual);
+                    Array.Sort(archivos);
                 }
-                catch (Exception ex)
+                catch
                 {
-                    Console.WriteLine($"⚠️ Error accediendo a archivos: {carpetaActual}");
-                    Console.WriteLine(ex.Message);
                     continue;
                 }
 
-                // 🔁 Recorrer subcarpetas
                 foreach (var dir in subdirectorios)
                 {
                     pendientes.Push(dir);
                 }
 
-                // 📄 Procesar archivos
                 foreach (var archivo in archivos)
                 {
-                    DateTime fechaModificacion;
-
-                    try
+                    // 🔥 SALTO HASTA LLEGAR AL ÚLTIMO
+                    if (!empezarAProcesar)
                     {
-                        fechaModificacion = File.GetLastWriteTime(archivo);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"⚠️ Error leyendo fecha archivo: {archivo}");
-                        Console.WriteLine(ex.Message);
+                        if (archivo == ultimaRutaProcesada)
+                        {
+                            empezarAProcesar = true;
+                        }
                         continue;
                     }
 
-                    // 🔥 FILTRO CLAVE (INCREMENTAL)
-                    if (fechaModificacion > ultimaEjecucion)
+                    DateTime fechaMod;
+
+                    try
+                    {
+                        fechaMod = File.GetLastWriteTime(archivo);
+                    }
+                    catch
+                    {
+                        continue;
+                    }
+
+                    if (fechaMod > ultimaEjecucion)
                     {
                         yield return archivo;
                     }

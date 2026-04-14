@@ -10,6 +10,7 @@ namespace Indexador.Data
     public class SqlRepository
     {
         private readonly string _connectionString =
+            //"Server=ServiciosReleas\\SQLEXPRESS;Database=FilesNas;Trusted_Connection=True;TrustServerCertificate=True";
             "Server=(localdb)\\MSSQLLocalDB;Database=FilesNas;Trusted_Connection=True;TrustServerCertificate=True";
 
         public async Task BulkInsertAsync(List<ArchivoModel> archivos)
@@ -196,6 +197,29 @@ namespace Indexador.Data
 
             var cmd = new SqlCommand("UPDATE IndexadorControl SET UltimaEjecucion = @fecha WHERE Id = 1", connection);
             cmd.Parameters.AddWithValue("@fecha", fecha);
+
+            await cmd.ExecuteNonQueryAsync();
+        }
+
+        public async Task<string?> ObtenerUltimaRutaAsync()
+        {
+            using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            var cmd = new SqlCommand("SELECT UltimaRutaProcesada FROM IndexadorProgreso WHERE Id = 1", connection);
+
+            var result = await cmd.ExecuteScalarAsync();
+
+            return result?.ToString();
+        }
+
+        public async Task GuardarUltimaRutaAsync(string ruta)
+        {
+            using var connection = new SqlConnection(_connectionString);
+            await connection.OpenAsync();
+
+            var cmd = new SqlCommand("UPDATE IndexadorProgreso SET UltimaRutaProcesada = @ruta WHERE Id = 1", connection);
+            cmd.Parameters.AddWithValue("@ruta", ruta);
 
             await cmd.ExecuteNonQueryAsync();
         }

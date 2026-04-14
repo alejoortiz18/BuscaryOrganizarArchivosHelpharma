@@ -45,23 +45,23 @@ public class SoportesController : Controller
                     await item.Archivo.CopyToAsync(stream);
                 }
 
-                var respuesta = await _soporteApi.EnviarSoporteAsync(item.Soporte);
+                var (resultado, msn) = await _soporteApi.EnviarSoporteAsync(item.Soporte);
 
-                if (respuesta == null)
+                if (resultado == null)
                 {
-                    resultados.Add($"{item.Soporte} → Error LEER DATOS");
+                    resultados.Add($"{item.Soporte} → Error LEER DATOS: {msn}");
                     continue;
                 }
 
-                var enviado = await _soporteFisicoApi.EnviarSoporteFisicoAsync(
+                var (isOK, mensaje) = await _soporteFisicoApi.EnviarSoporteFisicoAsync(
                     item.Soporte,
                     rutaTemp,
-                    respuesta
+                    resultado
                 );
 
-                if (!enviado)
+                if (!isOK)
                 {
-                    resultados.Add($"{item.Soporte} → Error ENVIANDO ARCHIVO");
+                    resultados.Add($"{item.Soporte} → Error ENVIANDO ARCHIVO: {mensaje}");
                     continue;
                 }
 

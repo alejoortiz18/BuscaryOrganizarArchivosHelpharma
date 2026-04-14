@@ -17,14 +17,11 @@ namespace ArchivosNas.Services
             _logger = logger;
         }
 
-        public async Task<SoporteResponseDto?> EnviarSoporteAsync(string soporte)
+        public async Task<(SoporteResponseDto?, string)> EnviarSoporteAsync(string soporte)
         {
             try
             {
-                var body = new
-                {
-                    soporte = soporte
-                };
+                var body = new { soporte };
 
                 var json = JsonSerializer.Serialize(body);
 
@@ -37,6 +34,16 @@ namespace ArchivosNas.Services
                 var response = await _httpClient.SendAsync(request);
 
                 var contenido = await response.Content.ReadAsStringAsync();
+
+                string message = "";
+
+                using (JsonDocument doc = JsonDocument.Parse(contenido))
+                {
+                    if (doc.RootElement.TryGetProperty("message", out var msgElement))
+                    {
+                        message = msgElement.GetString();
+                    }
+                }
 
                 if (response.IsSuccessStatusCode)
                 {
@@ -53,7 +60,7 @@ namespace ArchivosNas.Services
                         resultado?.NombrePaciente
                     );
 
-                    return resultado;
+                    return (resultado, message);
                 }
                 else
                 {
@@ -64,18 +71,13 @@ namespace ArchivosNas.Services
                         contenido
                     );
 
-                    return null;
+                    return (null, string.IsNullOrEmpty(message) ? contenido : message);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(
-                    ex,
-                    "ApiSoporteException | Soporte={Soporte}",
-                    soporte
-                );
-
-                return null;
+                _logger.LogError(ex, "ApiSoporteException | Soporte={Soporte}", soporte);
+                return (null, ex.Message);
             }
         }
     }

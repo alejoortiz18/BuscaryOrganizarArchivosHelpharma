@@ -18,10 +18,10 @@ namespace ArchivosNas.Services
             _logger = logger;
         }
 
-        public async Task<bool> EnviarSoporteFisicoAsync(
-            string soporte,
-            string rutaArchivo,
-            SoporteResponseDto data)
+        public async Task<(bool, string)> EnviarSoporteFisicoAsync(
+    string soporte,
+    string rutaArchivo,
+    SoporteResponseDto data)
         {
             try
             {
@@ -57,10 +57,9 @@ namespace ArchivosNas.Services
                 form.Add(new StringContent(data.Observacion ?? ""), "observacion");
                 form.Add(new StringContent(data.ValorCM ?? "0"), "valorCM");
 
-                // 🔥 CAMPOS ADICIONALES (puedes ajustar luego)
                 form.Add(new StringContent("system"), "idUsuario");
 
-                // 🔥 MEDICAMENTOS (JSON)
+                // 🔥 MEDICAMENTOS
                 var medicamentosJson = JsonSerializer.Serialize(data.medicamentos);
                 form.Add(new StringContent(medicamentosJson, Encoding.UTF8, "application/json"), "medicamentos");
 
@@ -83,6 +82,28 @@ namespace ArchivosNas.Services
                 var response = await _httpClient.SendAsync(request);
                 var contenido = await response.Content.ReadAsStringAsync();
 
+                string message = "";
+
+                // 🔥 PARSEO SEGURO
+                try
+                {
+                    using JsonDocument doc = JsonDocument.Parse(contenido);
+
+                    if (doc.RootElement.TryGetProperty("message", out var msgElement))
+                    {
+                        message = msgElement.GetString();
+                    }
+                    else if (doc.RootElement.TryGetProperty("errors", out var errorsElement))
+                    {
+                        message = errorsElement.ToString();
+                    }
+                }
+                catch
+                {
+                    // Si la respuesta NO es JSON válido
+                    message = contenido;
+                }
+
                 if (response.IsSuccessStatusCode)
                 {
                     _logger.LogInformation(
@@ -90,7 +111,7 @@ namespace ArchivosNas.Services
                         soporte
                     );
 
-                    return true;
+                    return (true, string.IsNullOrEmpty(message) ? "OK" : message);
                 }
                 else
                 {
@@ -101,7 +122,7 @@ namespace ArchivosNas.Services
                         contenido
                     );
 
-                    return false;
+                    return (false, string.IsNullOrEmpty(message) ? contenido : message);
                 }
             }
             catch (Exception ex)
@@ -112,7 +133,7 @@ namespace ArchivosNas.Services
                     soporte
                 );
 
-                return false;
+                return (false, ex.Message);
             }
         }
     }

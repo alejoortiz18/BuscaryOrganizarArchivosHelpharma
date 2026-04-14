@@ -49,7 +49,7 @@ public class SoportesController : Controller
 
                 if (respuesta == null)
                 {
-                    resultados.Add($"{item.Soporte} → Error API 1");
+                    resultados.Add($"{item.Soporte} → Error LEER DATOS");
                     continue;
                 }
 
@@ -61,7 +61,7 @@ public class SoportesController : Controller
 
                 if (!enviado)
                 {
-                    resultados.Add($"{item.Soporte} → Error API 2");
+                    resultados.Add($"{item.Soporte} → Error ENVIANDO ARCHIVO");
                     continue;
                 }
 
